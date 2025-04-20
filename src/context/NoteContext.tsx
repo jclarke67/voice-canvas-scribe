@@ -1,7 +1,9 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { Note, NoteContextType, Recording, Folder } from '@/types';
-import { getNotes, saveNotes, createEmptyNote, generateId, getAudioFromStorage, removeAudioFromStorage, getFolders, saveFolders } from '@/lib/storage';
+import { Note, NoteContextType, Recording, Folder, SummarySettings } from '@/types';
+import { getNotes, saveNotes, createEmptyNote, generateId, getAudioFromStorage, removeAudioFromStorage, getFolders, saveFolders, getSyncedNotes, saveSyncedNotes, getSummarySettings, saveSummarySettings } from '@/lib/storage';
 import { toast } from 'sonner';
+import { processAutoSummarization } from '@/lib/autoSummarize';
+import { getWeekNumber } from '@/lib/dateUtils';
 
 const NoteContext = createContext<NoteContextType | undefined>(undefined);
 
@@ -10,16 +12,38 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [folders, setFolders] = useState<Folder[]>([]);
   const [currentNote, setCurrentNote] = useState<Note | null>(null);
   const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
+  const [summarySettings, setSummarySettings] = useState<SummarySettings>({
+    enabled: true,
+    lastProcessedWeek: ''
+  });
 
   useEffect(() => {
     const savedNotes = getNotes();
     const savedFolders = getFolders();
+    const savedSettings = getSummarySettings();
     setNotes(savedNotes);
     setFolders(savedFolders);
+    setSummarySettings(savedSettings);
     if (savedNotes.length > 0) {
       setCurrentNote(savedNotes[0]);
     }
   }, []);
+
+  useEffect(() => {
+    if (!summarySettings.enabled) return;
+
+    const currentWeekId = getWeekNumber(new Date());
+    
+    if (summarySettings.lastProcessedWeek === currentWeekId) return;
+    
+    processSummaries();
+    
+    const checkInterval = setInterval(() => {
+      processSummaries();
+    }, 24 * 60 * 60 * 1000);
+    
+    return () => clearInterval(checkInterval);
+  }, [summarySettings.enabled, summarySettings.lastProcessedWeek, notes, folders]);
 
   const createNote = (folderId?: string) => {
     const newNote = createEmptyNote(folderId);
@@ -44,6 +68,18 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
         note.id === noteWithTimestamp.id ? noteWithTimestamp : note
       );
       saveNotes(updatedNotes);
+      
+      if (noteWithTimestamp.synced) {
+        const syncedNotes = getSyncedNotes();
+        const updatedSyncedNotes = syncedNotes.map(note => 
+          note.id === noteWithTimestamp.id ? noteWithTimestamp : note
+        );
+        if (!updatedSyncedNotes.find(note => note.id === noteWithTimestamp.id)) {
+          updatedSyncedNotes.push(noteWithTimestamp);
+        }
+        saveSyncedNotes(updatedSyncedNotes);
+      }
+      
       return updatedNotes;
     });
 
@@ -53,7 +89,6 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const deleteNote = (id: string) => {
-    // First, clean up any recordings associated with this note
     const noteToDelete = notes.find(note => note.id === id);
     if (noteToDelete) {
       noteToDelete.recordings.forEach(recording => {
@@ -65,7 +100,12 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const updatedNotes = prevNotes.filter(note => note.id !== id);
       saveNotes(updatedNotes);
       
-      // If the current note is deleted, set current note to the first available note or null
+      if (noteToDelete?.synced) {
+        const syncedNotes = getSyncedNotes();
+        const updatedSyncedNotes = syncedNotes.filter(note => note.id !== id);
+        saveSyncedNotes(updatedSyncedNotes);
+      }
+      
       if (currentNote && currentNote.id === id) {
         if (updatedNotes.length > 0) {
           setCurrentNote(updatedNotes[0]);
@@ -77,7 +117,6 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return updatedNotes;
     });
     
-    // Remove from selected notes if it's there
     if (selectedNoteIds.includes(id)) {
       setSelectedNoteIds(prev => prev.filter(noteId => noteId !== id));
     }
@@ -88,7 +127,7 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const saveRecording = (noteId: string, recordingData: Omit<Recording, 'id' | 'name'>, name?: string) => {
     const recording: Recording = {
       id: generateId(),
-      name: name || `Recording ${new Date().toLocaleString()}`, // Default name or provided name
+      name: name || `Recording ${new Date().toLocaleString()}`,
       ...recordingData
     };
 
@@ -101,9 +140,19 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
             updatedAt: Date.now()
           };
           
-          // Update current note if it's the modified one
           if (currentNote && currentNote.id === noteId) {
             setCurrentNote(updatedNote);
+          }
+          
+          if (updatedNote.synced) {
+            const syncedNotes = getSyncedNotes();
+            const updatedSyncedNotes = syncedNotes.map(n => 
+              n.id === updatedNote.id ? updatedNote : n
+            );
+            if (!updatedSyncedNotes.find(n => n.id === updatedNote.id)) {
+              updatedSyncedNotes.push(updatedNote);
+            }
+            saveSyncedNotes(updatedSyncedNotes);
           }
           
           return updatedNote;
@@ -133,7 +182,6 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
             updatedAt: Date.now()
           };
           
-          // Update current note if it's the modified one
           if (currentNote && currentNote.id === noteId) {
             setCurrentNote(updatedNote);
           }
@@ -153,10 +201,8 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setNotes(prevNotes => {
       const updatedNotes = prevNotes.map(note => {
         if (note.id === noteId) {
-          // Find the recording to get its audioUrl
           const recordingToDelete = note.recordings.find(rec => rec.id === recordingId);
           if (recordingToDelete) {
-            // Remove audio data from storage
             removeAudioFromStorage(`audio-${recordingToDelete.audioUrl}`);
           }
           
@@ -168,7 +214,6 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
             updatedAt: Date.now()
           };
           
-          // Update current note if it's the modified one
           if (currentNote && currentNote.id === noteId) {
             setCurrentNote(updatedNote);
           }
@@ -211,7 +256,6 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const deleteFolder = (id: string) => {
-    // Update notes that were in this folder to have no folder
     setNotes(prevNotes => {
       const updatedNotes = prevNotes.map(note => 
         note.folderId === id ? { ...note, folderId: undefined } : note
@@ -220,7 +264,6 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return updatedNotes;
     });
     
-    // Delete the folder
     setFolders(prevFolders => {
       const updatedFolders = prevFolders.filter(folder => folder.id !== id);
       saveFolders(updatedFolders);
@@ -231,11 +274,9 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const importRecording = async (noteId: string, file: File): Promise<void> => {
     try {
-      // Read the audio file
       const arrayBuffer = await file.arrayBuffer();
       const blob = new Blob([arrayBuffer], { type: file.type });
       
-      // Convert blob to base64 for storage
       const base64data = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onloadend = () => {
@@ -249,31 +290,25 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
         reader.readAsDataURL(blob);
       });
       
-      // Generate ID and store the audio
       const audioId = generateId();
       localStorage.setItem(`audio-${audioId}`, base64data);
       
-      // Create a new audio element to get the duration
       const audio = new Audio();
       audio.src = URL.createObjectURL(blob);
       
-      // Wait for the metadata to load to get the duration
       await new Promise<void>((resolve) => {
         audio.onloadedmetadata = () => {
           const duration = audio.duration;
           
-          // Create a new recording
           const recording: Omit<Recording, 'id' | 'name'> = {
             audioUrl: audioId,
             duration,
-            timestamp: 0, // Default to the beginning of the note
+            timestamp: 0,
             createdAt: Date.now()
           };
           
-          // Use the file name as the recording name if possible
-          const fileName = file.name.replace(/\.[^/.]+$/, ""); // Remove extension
+          const fileName = file.name.replace(/\.[^/.]+$/, "");
           
-          // Save the recording with the name
           saveRecording(noteId, recording, fileName || undefined);
           resolve();
         };
@@ -298,7 +333,6 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
       
-      // Create a download link for the audio
       const a = document.createElement('a');
       a.href = audioData;
       a.download = `${recording.name || 'recording'}.webm`;
@@ -328,8 +362,6 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const selectAllNotes = (folderId?: string) => {
-    // If folderId is provided, select all notes in that folder
-    // Otherwise, select all notes
     const notesToSelect = folderId 
       ? notes.filter(note => note.folderId === folderId)
       : notes;
@@ -349,7 +381,6 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       saveNotes(updatedNotes);
       
-      // Update current note if it's one of the moved notes
       if (currentNote && selectedNoteIds.includes(currentNote.id)) {
         const updatedCurrentNote = updatedNotes.find(note => note.id === currentNote.id);
         if (updatedCurrentNote) {
@@ -367,7 +398,6 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const deleteSelectedNotes = () => {
     if (selectedNoteIds.length === 0) return;
     
-    // Clean up recordings for all selected notes
     selectedNoteIds.forEach(noteId => {
       const noteToDelete = notes.find(note => note.id === noteId);
       if (noteToDelete) {
@@ -381,7 +411,6 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const updatedNotes = prevNotes.filter(note => !selectedNoteIds.includes(note.id));
       saveNotes(updatedNotes);
       
-      // If the current note is deleted, set current note to the first available note or null
       if (currentNote && selectedNoteIds.includes(currentNote.id)) {
         if (updatedNotes.length > 0) {
           setCurrentNote(updatedNotes[0]);
@@ -395,6 +424,153 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     toast.success(`Deleted ${selectedNoteIds.length} note${selectedNoteIds.length > 1 ? 's' : ''}`);
     clearNoteSelection();
+  };
+
+  const toggleNoteSync = (noteId: string) => {
+    setNotes(prevNotes => {
+      const updatedNotes = prevNotes.map(note => {
+        if (note.id === noteId) {
+          const updatedNote = {
+            ...note,
+            synced: !note.synced,
+            updatedAt: Date.now()
+          };
+          
+          const syncedNotes = getSyncedNotes();
+          if (updatedNote.synced) {
+            const updatedSyncedNotes = [...syncedNotes, updatedNote];
+            saveSyncedNotes(updatedSyncedNotes);
+          } else {
+            const updatedSyncedNotes = syncedNotes.filter(n => n.id !== noteId);
+            saveSyncedNotes(updatedSyncedNotes);
+          }
+          
+          if (currentNote && currentNote.id === noteId) {
+            setCurrentNote(updatedNote);
+          }
+          
+          return updatedNote;
+        }
+        return note;
+      });
+      
+      saveNotes(updatedNotes);
+      return updatedNotes;
+    });
+    
+    toast.success('Note sync status updated');
+  };
+
+  const syncSelectedNotes = () => {
+    if (selectedNoteIds.length === 0) return;
+    
+    setNotes(prevNotes => {
+      const updatedNotes = prevNotes.map(note => 
+        selectedNoteIds.includes(note.id)
+          ? { ...note, synced: true, updatedAt: Date.now() }
+          : note
+      );
+      
+      saveNotes(updatedNotes);
+      
+      const syncedNotes = getSyncedNotes();
+      const notesToSync = updatedNotes.filter(note => 
+        selectedNoteIds.includes(note.id)
+      );
+      
+      const updatedSyncedNotes = [...syncedNotes];
+      
+      notesToSync.forEach(noteToSync => {
+        const existingIndex = updatedSyncedNotes.findIndex(n => n.id === noteToSync.id);
+        if (existingIndex >= 0) {
+          updatedSyncedNotes[existingIndex] = noteToSync;
+        } else {
+          updatedSyncedNotes.push(noteToSync);
+        }
+      });
+      
+      saveSyncedNotes(updatedSyncedNotes);
+      
+      if (currentNote && selectedNoteIds.includes(currentNote.id)) {
+        const updatedCurrentNote = updatedNotes.find(note => note.id === currentNote.id);
+        if (updatedCurrentNote) {
+          setCurrentNote(updatedCurrentNote);
+        }
+      }
+      
+      return updatedNotes;
+    });
+    
+    toast.success(`Synced ${selectedNoteIds.length} note${selectedNoteIds.length > 1 ? 's' : ''} to cloud`);
+    clearNoteSelection();
+  };
+
+  const unsyncSelectedNotes = () => {
+    if (selectedNoteIds.length === 0) return;
+    
+    setNotes(prevNotes => {
+      const updatedNotes = prevNotes.map(note => 
+        selectedNoteIds.includes(note.id)
+          ? { ...note, synced: false, updatedAt: Date.now() }
+          : note
+      );
+      
+      saveNotes(updatedNotes);
+      
+      const syncedNotes = getSyncedNotes();
+      const updatedSyncedNotes = syncedNotes.filter(note => 
+        !selectedNoteIds.includes(note.id)
+      );
+      
+      saveSyncedNotes(updatedSyncedNotes);
+      
+      if (currentNote && selectedNoteIds.includes(currentNote.id)) {
+        const updatedCurrentNote = updatedNotes.find(note => note.id === currentNote.id);
+        if (updatedCurrentNote) {
+          setCurrentNote(updatedCurrentNote);
+        }
+      }
+      
+      return updatedNotes;
+    });
+    
+    toast.success(`Removed ${selectedNoteIds.length} note${selectedNoteIds.length > 1 ? 's' : ''} from cloud sync`);
+    clearNoteSelection();
+  };
+
+  const processSummaries = () => {
+    const currentWeekId = getWeekNumber(new Date());
+    
+    if (summarySettings.lastProcessedWeek === currentWeekId) return;
+    
+    const { summaryNotes } = processAutoSummarization(
+      notes,
+      folders,
+      createFolder,
+      createNote,
+      updateNote
+    );
+    
+    setSummarySettings(prev => {
+      const updatedSettings = {
+        ...prev,
+        lastProcessedWeek: currentWeekId
+      };
+      saveSummarySettings(updatedSettings);
+      return updatedSettings;
+    });
+    
+    if (summaryNotes.length > 0) {
+      toast.success(`Created ${summaryNotes.length} weekly summary note${summaryNotes.length > 1 ? 's' : ''}`);
+    }
+  };
+
+  const updateSummarySettings = (settings: Partial<SummarySettings>) => {
+    setSummarySettings(prev => {
+      const updatedSettings = { ...prev, ...settings };
+      saveSummarySettings(updatedSettings);
+      return updatedSettings;
+    });
   };
 
   const contextValue: NoteContextType = {
@@ -418,7 +594,13 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
     clearNoteSelection,
     selectAllNotes,
     moveSelectedNotesToFolder,
-    deleteSelectedNotes
+    deleteSelectedNotes,
+    toggleNoteSync,
+    syncSelectedNotes,
+    unsyncSelectedNotes,
+    processSummaries,
+    summarySettings,
+    updateSummarySettings
   };
 
   return (
