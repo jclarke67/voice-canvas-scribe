@@ -10,12 +10,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { exportFolderAsPDF, exportNotesAsPDF } from '@/lib/exportUtils';
 import { toast } from 'sonner';
 import MultiSelectControls from './MultiSelectControls';
-
 interface SidebarProps {
   isOpen: boolean;
   toggleSidebar: () => void;
 }
-
 const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
   toggleSidebar
@@ -34,21 +32,18 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [showFolderManager, setShowFolderManager] = useState(false);
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
   const [editingFolderName, setEditingFolderName] = useState('');
-
   const toggleFolder = (folderId: string) => {
     setExpandedFolders(prev => ({
       ...prev,
       [folderId]: !prev[folderId]
     }));
   };
-
   const handleDeleteFolder = (folderId: string, e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent folder toggle
     if (window.confirm('Are you sure you want to delete this folder? Notes will be moved to Unfiled.')) {
       deleteFolder(folderId);
     }
   };
-
   const handleExportFolder = (folderId: string, e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent folder toggle
     const folder = folders.find(f => f.id === folderId);
@@ -58,7 +53,6 @@ const Sidebar: React.FC<SidebarProps> = ({
     }
     exportFolderAsPDF(folder, notes);
   };
-
   const handleExportAllNotes = () => {
     if (notes.length === 0) {
       toast.error('No notes to export');
@@ -66,22 +60,18 @@ const Sidebar: React.FC<SidebarProps> = ({
     }
     exportNotesAsPDF(notes, 'All Notes');
   };
-
   const filteredNotes = searchTerm ? notes.filter(note => note.title.toLowerCase().includes(searchTerm.toLowerCase()) || note.content.toLowerCase().includes(searchTerm.toLowerCase())) : notes;
   const sortedNotes = [...filteredNotes].sort((a, b) => b.updatedAt - a.updatedAt);
   const unfilteredNotes = sortedNotes.filter(note => !note.folderId);
   const folderNotes: Record<string, typeof sortedNotes> = {};
-  
   folders.forEach(folder => {
     folderNotes[folder.id] = sortedNotes.filter(note => note.folderId === folder.id);
   });
-
   const handleStartEditingFolder = (folderId: string, folderName: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingFolderId(folderId);
     setEditingFolderName(folderName);
   };
-
   const handleSaveFolder = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingFolderId && editingFolderName.trim()) {
@@ -90,7 +80,6 @@ const Sidebar: React.FC<SidebarProps> = ({
       setEditingFolderName('');
     }
   };
-
   return <div className="h-full flex flex-col bg-background border-r">
       <div className="flex items-center justify-between p-4 border-b">
         <h1 className="font-semibold text-lg">Voice Canvas</h1>
@@ -111,7 +100,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>}
         
         {!searchTerm && <div className="mb-2 flex justify-between items-center">
-            <div className="text-sm font-medium text-muted-foreground px-2 py-1">Folders</div>
+            <div className="text-sm font-medium text-muted-foreground px-2 py-1">Folders 2</div>
             <div className="flex space-x-1">
               <button onClick={handleExportAllNotes} className="p-1 rounded-md hover:bg-accent text-muted-foreground" title="Export all notes">
                 <FileDown size={16} />
@@ -190,14 +179,6 @@ const Sidebar: React.FC<SidebarProps> = ({
           New Note
         </button>
       </div>
-
-      {showFolderManager && (
-        <FolderManager 
-          isOpen={showFolderManager} 
-          onClose={() => setShowFolderManager(false)} 
-        />
-      )}
     </div>;
 };
-
 export default Sidebar;

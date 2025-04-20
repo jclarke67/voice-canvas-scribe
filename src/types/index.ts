@@ -8,7 +8,6 @@ export interface Note {
   updatedAt: number;
   recordings: Recording[];
   folderId?: string; // Optional folder association
-  synced?: boolean; // New field to track sync status
 }
 
 export interface Recording {
@@ -24,12 +23,6 @@ export interface Folder {
   id: string;
   name: string;
   createdAt: number;
-}
-
-// New interface for auto-summarization settings
-export interface SummarySettings {
-  enabled: boolean;
-  lastProcessedWeek: string;
 }
 
 export type NoteContextType = {
@@ -55,12 +48,4 @@ export type NoteContextType = {
   selectAllNotes: (folderId?: string) => void;
   moveSelectedNotesToFolder: (folderId?: string) => void;
   deleteSelectedNotes: () => void;
-  // Add cloud sync related methods
-  toggleNoteSync: (noteId: string) => void;
-  syncSelectedNotes: () => void;
-  unsyncSelectedNotes: () => void;
-  // Auto-summarization methods
-  processSummaries: () => void;
-  summarySettings: SummarySettings;
-  updateSummarySettings: (settings: Partial<SummarySettings>) => void;
 };
