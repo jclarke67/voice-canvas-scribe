@@ -18,6 +18,7 @@ import {
   DropdownMenuItem, 
   DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu';
+import { Textarea } from './ui/textarea';
 
 const NoteEditor: React.FC = () => {
   const { currentNote, updateNote, deleteNote, folders } = useNotes();
@@ -119,7 +120,7 @@ const NoteEditor: React.FC = () => {
   }
   
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-[100vh] overflow-hidden">
       <div className="flex items-center justify-between p-4 border-b">
         <div className="flex items-center space-x-2">
           <input
@@ -192,25 +193,27 @@ const NoteEditor: React.FC = () => {
       </div>
       
       <div className="flex-1 overflow-auto p-4 flex flex-col">
-        <textarea
+        <Textarea
           ref={textareaRef}
           value={content}
           onChange={handleContentChange}
           placeholder="Type your note here..."
-          className="w-full flex-1 resize-none bg-transparent border-none outline-none focus:ring-0 text-foreground min-h-[200px]"
+          className="w-full h-[80vh] resize-none bg-transparent border-none outline-none focus:ring-0 text-foreground"
         />
         
         {currentNote.recordings.length > 0 && (
           <div className="mt-2 border-t pt-2">
             <h3 className="font-medium text-sm mb-1">Voice notes</h3>
-            {currentNote.recordings.map(recording => (
-              <AudioPlayer 
-                key={recording.id} 
-                audioId={recording.audioUrl} 
-                duration={recording.duration} 
-                name={recording.name}
-              />
-            ))}
+            <div className="space-y-2 max-h-[20vh] overflow-y-auto">
+              {currentNote.recordings.map(recording => (
+                <AudioPlayer 
+                  key={recording.id} 
+                  audioId={recording.audioUrl} 
+                  duration={recording.duration} 
+                  name={recording.name}
+                />
+              ))}
+            </div>
           </div>
         )}
       </div>
