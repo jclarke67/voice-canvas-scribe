@@ -19,8 +19,7 @@ const NoteContainer = () => {
   
   useEffect(() => {
     if (isMobile) {
-      // On mobile, show sidebar by default but with smaller size
-      setSidebarOpen(true);
+      setSidebarOpen(false);
     } else {
       setSidebarOpen(true);
     }
@@ -57,19 +56,14 @@ const NoteContainer = () => {
   
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
-      <ResizablePanelGroup direction="horizontal" onLayout={(sizes) => {
-        // Store the sizes in localStorage to persist user preferences
-        localStorage.setItem('sidebar-sizes', JSON.stringify(sizes));
-      }}>
+      <ResizablePanelGroup direction="horizontal">
         {sidebarOpen && (
           <>
             <ResizablePanel 
-              defaultSize={isMobile ? 40 : 25} 
-              minSize={isMobile ? 25 : 15} 
-              maxSize={isMobile ? 75 : 40}
+              defaultSize={25} 
+              minSize={15} 
+              maxSize={40}
               className="h-screen"
-              // This makes the panel resize correctly on mobile
-              style={{ minWidth: isMobile ? '180px' : '200px' }}
             >
               <Sidebar isOpen={sidebarOpen} toggleSidebar={toggleSidebar} />
             </ResizablePanel>
