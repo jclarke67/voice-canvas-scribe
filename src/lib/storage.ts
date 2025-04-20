@@ -61,7 +61,9 @@ export const getSummarySettings = (): SummarySettings => {
   if (!settingsJson) {
     return {
       enabled: true,
-      lastProcessedWeek: ''
+      lastProcessedWeek: '',
+      scheduledDay: 'Sunday',
+      scheduledHour: 6
     };
   }
   
@@ -71,7 +73,9 @@ export const getSummarySettings = (): SummarySettings => {
     console.error('Failed to parse summary settings from localStorage', error);
     return {
       enabled: true,
-      lastProcessedWeek: ''
+      lastProcessedWeek: '',
+      scheduledDay: 'Sunday',
+      scheduledHour: 6
     };
   }
 };

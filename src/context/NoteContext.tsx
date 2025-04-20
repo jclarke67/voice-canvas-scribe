@@ -14,7 +14,9 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
   const [summarySettings, setSummarySettings] = useState<SummarySettings>({
     enabled: true,
-    lastProcessedWeek: ''
+    lastProcessedWeek: '',
+    scheduledDay: 'Sunday',
+    scheduledHour: 6
   });
 
   useEffect(() => {
