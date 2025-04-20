@@ -1,4 +1,5 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+
+import { useState, useRef, useCallback } from 'react';
 import { saveAudioToStorage } from '@/lib/storage';
 
 interface RecordingResult {
@@ -15,50 +16,6 @@ export const useAudioRecorder = () => {
   const audioChunksRef = useRef<Blob[]>([]);
   const startTimeRef = useRef<number>(0);
   const timerRef = useRef<number | null>(null);
-
-  // Keep recording state in sessionStorage to recover after page refresh
-  useEffect(() => {
-    const savedRecordingState = sessionStorage.getItem('voice-canvas-recording-state');
-    if (savedRecordingState) {
-      try {
-        const state = JSON.parse(savedRecordingState);
-        if (state.isRecording) {
-          // Try to restart recording
-          startTimeRef.current = state.startTime || Date.now();
-          setRecordingTime(Math.floor((Date.now() - startTimeRef.current) / 1000));
-          // We can't truly restore the MediaRecorder, but we can update the UI
-          // to indicate recording and then let user manually stop/restart
-          setIsRecording(true);
-          // Start timer
-          timerRef.current = window.setInterval(() => {
-            setRecordingTime(Math.floor((Date.now() - startTimeRef.current) / 1000));
-          }, 1000);
-        }
-      } catch (error) {
-        console.error('Failed to parse recording state:', error);
-        sessionStorage.removeItem('voice-canvas-recording-state');
-      }
-    }
-
-    // Clean up on unmount
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-    };
-  }, []);
-
-  // Update session storage whenever recording state changes
-  useEffect(() => {
-    if (isRecording) {
-      sessionStorage.setItem('voice-canvas-recording-state', JSON.stringify({
-        isRecording,
-        startTime: startTimeRef.current
-      }));
-    } else {
-      sessionStorage.removeItem('voice-canvas-recording-state');
-    }
-  }, [isRecording]);
 
   // Check microphone permission status
   const checkPermission = useCallback(async () => {
@@ -148,10 +105,6 @@ export const useAudioRecorder = () => {
               
               setIsRecording(false);
               setRecordingTime(0);
-
-              // Clear recording state from session storage
-              sessionStorage.removeItem('voice-canvas-recording-state');
-              
               resolve({ audioUrl: audioId, duration });
             } catch (error) {
               console.error('Error saving audio:', error);
