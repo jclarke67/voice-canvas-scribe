@@ -72,7 +72,7 @@ const NoteContainer = () => {
         )}
         
         <ResizablePanel defaultSize={75}>
-          <div className="flex-1 flex flex-col overflow-hidden relative">
+          <div className="flex-1 flex flex-col overflow-hidden relative h-[100vh]">
             {!sidebarOpen && (
               <button 
                 onClick={toggleSidebar}
