@@ -1,4 +1,3 @@
-
 // Type definitions for the application
 export interface Note {
   id: string;
@@ -30,6 +29,8 @@ export interface Folder {
 export interface SummarySettings {
   enabled: boolean;
   lastProcessedWeek: string;
+  scheduledDay: 'Sunday';
+  scheduledHour: 6; // 6 AM ET
 }
 
 export type NoteContextType = {
