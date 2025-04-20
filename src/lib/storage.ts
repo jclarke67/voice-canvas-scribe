@@ -1,5 +1,5 @@
 
-import { Note, Recording, Folder } from '@/types';
+import { Note, Recording, Folder, SummarySettings } from '@/types';
 
 // Get all notes from localStorage
 export const getNotes = (): Note[] => {
@@ -17,6 +17,24 @@ export const getNotes = (): Note[] => {
 // Save notes to localStorage
 export const saveNotes = (notes: Note[]): void => {
   localStorage.setItem('voice-canvas-notes', JSON.stringify(notes));
+};
+
+// Get synced notes from localStorage
+export const getSyncedNotes = (): Note[] => {
+  const notesJson = localStorage.getItem('voice-canvas-synced-notes');
+  if (!notesJson) return [];
+  
+  try {
+    return JSON.parse(notesJson);
+  } catch (error) {
+    console.error('Failed to parse synced notes from localStorage', error);
+    return [];
+  }
+};
+
+// Save synced notes to localStorage
+export const saveSyncedNotes = (notes: Note[]): void => {
+  localStorage.setItem('voice-canvas-synced-notes', JSON.stringify(notes));
 };
 
 // Get all folders from localStorage
@@ -37,6 +55,32 @@ export const saveFolders = (folders: Folder[]): void => {
   localStorage.setItem('voice-canvas-folders', JSON.stringify(folders));
 };
 
+// Get summary settings from localStorage
+export const getSummarySettings = (): SummarySettings => {
+  const settingsJson = localStorage.getItem('voice-canvas-summary-settings');
+  if (!settingsJson) {
+    return {
+      enabled: true,
+      lastProcessedWeek: ''
+    };
+  }
+  
+  try {
+    return JSON.parse(settingsJson);
+  } catch (error) {
+    console.error('Failed to parse summary settings from localStorage', error);
+    return {
+      enabled: true,
+      lastProcessedWeek: ''
+    };
+  }
+};
+
+// Save summary settings to localStorage
+export const saveSummarySettings = (settings: SummarySettings): void => {
+  localStorage.setItem('voice-canvas-summary-settings', JSON.stringify(settings));
+};
+
 // Generate a unique ID
 export const generateId = (): string => {
   return Date.now().toString(36) + Math.random().toString(36).substring(2);
@@ -52,6 +96,7 @@ export const createEmptyNote = (folderId?: string): Note => {
     createdAt: now,
     updatedAt: now,
     recordings: [],
+    synced: false,
     ...(folderId ? { folderId } : {})
   };
 };
