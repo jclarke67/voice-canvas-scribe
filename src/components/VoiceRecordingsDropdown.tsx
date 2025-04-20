@@ -42,7 +42,6 @@ const VoiceRecordingsDropdown: React.FC<VoiceRecordingsDropdownProps> = ({ noteI
   }, []);
   
   const handlePlay = (e: React.MouseEvent, recording: Recording) => {
-    e.preventDefault();
     e.stopPropagation(); // Prevent the dropdown from closing
     
     if (!audioRef.current) return;
@@ -78,13 +77,11 @@ const VoiceRecordingsDropdown: React.FC<VoiceRecordingsDropdownProps> = ({ noteI
   };
   
   const handleExport = (e: React.MouseEvent, recording: Recording) => {
-    e.preventDefault();
     e.stopPropagation(); // Prevent the dropdown from closing
     exportRecording(recording);
   };
   
   const handleDelete = (e: React.MouseEvent, recordingId: string) => {
-    e.preventDefault();
     e.stopPropagation(); // Prevent the dropdown from closing
     
     if (window.confirm('Are you sure you want to delete this recording?')) {
@@ -114,7 +111,7 @@ const VoiceRecordingsDropdown: React.FC<VoiceRecordingsDropdownProps> = ({ noteI
             <Headphones size={16} />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56" onCloseAutoFocus={(e) => e.preventDefault()}>
+        <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuLabel>Voice Recordings</DropdownMenuLabel>
           <DropdownMenuSeparator />
           
