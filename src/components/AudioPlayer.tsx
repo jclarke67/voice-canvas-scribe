@@ -155,12 +155,12 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioId, duration, name }) =>
           
           <div 
             ref={progressBarRef}
-            className="relative h-2 flex-1 bg-primary/20 rounded-full cursor-pointer"
+            className="relative h-2 flex-1 bg-primary/20 rounded-full cursor-pointer overflow-hidden"
             onClick={handleProgressClick}
           >
             <div 
               className="absolute top-0 left-0 h-full bg-primary rounded-full transition-all"
-              style={{ width: `${progressPercent}%` }}
+              style={{ width: `${Math.min(progressPercent, 100)}%` }}
             />
           </div>
           
