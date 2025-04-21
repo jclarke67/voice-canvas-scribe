@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Mic, StopCircle, Keyboard } from 'lucide-react';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
@@ -31,8 +30,28 @@ const RecordingButton: React.FC<RecordingButtonProps> = ({ getCursorPosition }) 
       }
     }, 5000);
     
-    return () => clearTimeout(timer);
-  }, [checkPermission, isRecording]);
+    // Handle beforeunload to save recording if page is refreshed
+    const handleBeforeUnload = async () => {
+      if (isRecording && currentNote) {
+        const result = await stopRecording();
+        if (result) {
+          saveRecording(currentNote.id, {
+            audioUrl: result.audioUrl,
+            duration: result.duration,
+            timestamp: getCursorPosition(),
+            createdAt: Date.now()
+          });
+        }
+      }
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [checkPermission, isRecording, stopRecording, currentNote, saveRecording, getCursorPosition]);
 
   const handleStartRecording = async () => {
     try {

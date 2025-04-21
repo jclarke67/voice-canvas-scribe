@@ -1,4 +1,3 @@
-
 import { Note, Recording, Folder } from '@/types';
 
 // Get all notes from localStorage
@@ -16,7 +15,19 @@ export const getNotes = (): Note[] => {
 
 // Save notes to localStorage
 export const saveNotes = (notes: Note[]): void => {
-  localStorage.setItem('voice-canvas-notes', JSON.stringify(notes));
+  try {
+    localStorage.setItem('voice-canvas-notes', JSON.stringify(notes));
+    // Validate that the notes were saved correctly
+    const savedJson = localStorage.getItem('voice-canvas-notes');
+    if (!savedJson) {
+      console.error('Failed to save notes to localStorage: No data found after save');
+    } else {
+      // Try parsing to ensure data integrity
+      JSON.parse(savedJson);
+    }
+  } catch (error) {
+    console.error('Failed to save notes to localStorage', error);
+  }
 };
 
 // Get all folders from localStorage
@@ -52,6 +63,7 @@ export const createEmptyNote = (folderId?: string): Note => {
     createdAt: now,
     updatedAt: now,
     recordings: [],
+    synced: false, // Add synced flag (defaults to false/local only)
     ...(folderId ? { folderId } : {})
   };
 };

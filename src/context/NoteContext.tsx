@@ -3,6 +3,8 @@ import { Note, NoteContextType, Recording, Folder } from '@/types';
 import { getNotes, saveNotes, createEmptyNote, generateId, getAudioFromStorage, removeAudioFromStorage, getFolders, saveFolders } from '@/lib/storage';
 import { toast } from 'sonner';
 
+const CLOUD_SYNC_KEY = 'voice-canvas-cloud-sync';
+
 const NoteContext = createContext<NoteContextType | undefined>(undefined);
 
 export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -10,24 +12,46 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [folders, setFolders] = useState<Folder[]>([]);
   const [currentNote, setCurrentNote] = useState<Note | null>(null);
   const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
-    const savedNotes = getNotes();
-    const savedFolders = getFolders();
-    setNotes(savedNotes);
-    setFolders(savedFolders);
-    if (savedNotes.length > 0) {
-      setCurrentNote(savedNotes[0]);
-    }
+    const loadInitialData = async () => {
+      const savedNotes = getNotes();
+      const savedFolders = getFolders();
+      
+      setNotes(savedNotes);
+      setFolders(savedFolders);
+      
+      try {
+        await getSyncedNotes();
+      } catch (error) {
+        console.error('Failed to load synced notes:', error);
+      }
+      
+      if (savedNotes.length > 0) {
+        setCurrentNote(savedNotes[0]);
+      }
+      
+      setIsInitialized(true);
+    };
+    
+    loadInitialData();
   }, []);
+
+  useEffect(() => {
+    if (isInitialized) {
+      saveNotes(notes);
+    }
+  }, [notes, isInitialized]);
 
   const createNote = (folderId?: string) => {
     const newNote = createEmptyNote(folderId);
+    
     setNotes(prevNotes => {
       const updatedNotes = [...prevNotes, newNote];
-      saveNotes(updatedNotes);
       return updatedNotes;
     });
+    
     setCurrentNote(newNote);
     toast.success('Note created');
   };
@@ -43,19 +67,29 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const updatedNotes = prevNotes.map(note => 
         note.id === noteWithTimestamp.id ? noteWithTimestamp : note
       );
-      saveNotes(updatedNotes);
       return updatedNotes;
     });
 
     if (currentNote && currentNote.id === updatedNote.id) {
       setCurrentNote(noteWithTimestamp);
     }
+    
+    if (updatedNote.synced) {
+      syncNote(updatedNote.id).catch(error => {
+        console.error('Failed to sync updated note:', error);
+      });
+    }
   };
 
   const deleteNote = (id: string) => {
-    // First, clean up any recordings associated with this note
     const noteToDelete = notes.find(note => note.id === id);
     if (noteToDelete) {
+      if (noteToDelete.synced) {
+        unsyncNote(id).catch(error => {
+          console.error('Failed to unsync deleted note:', error);
+        });
+      }
+      
       noteToDelete.recordings.forEach(recording => {
         removeAudioFromStorage(`audio-${recording.audioUrl}`);
       });
@@ -63,21 +97,18 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     setNotes(prevNotes => {
       const updatedNotes = prevNotes.filter(note => note.id !== id);
-      saveNotes(updatedNotes);
-      
-      // If the current note is deleted, set current note to the first available note or null
-      if (currentNote && currentNote.id === id) {
-        if (updatedNotes.length > 0) {
-          setCurrentNote(updatedNotes[0]);
-        } else {
-          setCurrentNote(null);
-        }
-      }
-      
       return updatedNotes;
     });
     
-    // Remove from selected notes if it's there
+    if (currentNote && currentNote.id === id) {
+      if (notes.length > 0) {
+        const firstOtherNote = notes.find(note => note.id !== id);
+        setCurrentNote(firstOtherNote || null);
+      } else {
+        setCurrentNote(null);
+      }
+    }
+    
     if (selectedNoteIds.includes(id)) {
       setSelectedNoteIds(prev => prev.filter(noteId => noteId !== id));
     }
@@ -88,7 +119,7 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const saveRecording = (noteId: string, recordingData: Omit<Recording, 'id' | 'name'>, name?: string) => {
     const recording: Recording = {
       id: generateId(),
-      name: name || `Recording ${new Date().toLocaleString()}`, // Default name or provided name
+      name: name || `Recording ${new Date().toLocaleString()}`,
       ...recordingData
     };
 
@@ -101,7 +132,6 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
             updatedAt: Date.now()
           };
           
-          // Update current note if it's the modified one
           if (currentNote && currentNote.id === noteId) {
             setCurrentNote(updatedNote);
           }
@@ -133,7 +163,6 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
             updatedAt: Date.now()
           };
           
-          // Update current note if it's the modified one
           if (currentNote && currentNote.id === noteId) {
             setCurrentNote(updatedNote);
           }
@@ -153,10 +182,8 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setNotes(prevNotes => {
       const updatedNotes = prevNotes.map(note => {
         if (note.id === noteId) {
-          // Find the recording to get its audioUrl
           const recordingToDelete = note.recordings.find(rec => rec.id === recordingId);
           if (recordingToDelete) {
-            // Remove audio data from storage
             removeAudioFromStorage(`audio-${recordingToDelete.audioUrl}`);
           }
           
@@ -168,7 +195,6 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
             updatedAt: Date.now()
           };
           
-          // Update current note if it's the modified one
           if (currentNote && currentNote.id === noteId) {
             setCurrentNote(updatedNote);
           }
@@ -211,7 +237,6 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const deleteFolder = (id: string) => {
-    // Update notes that were in this folder to have no folder
     setNotes(prevNotes => {
       const updatedNotes = prevNotes.map(note => 
         note.folderId === id ? { ...note, folderId: undefined } : note
@@ -220,7 +245,6 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return updatedNotes;
     });
     
-    // Delete the folder
     setFolders(prevFolders => {
       const updatedFolders = prevFolders.filter(folder => folder.id !== id);
       saveFolders(updatedFolders);
@@ -231,11 +255,9 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const importRecording = async (noteId: string, file: File): Promise<void> => {
     try {
-      // Read the audio file
       const arrayBuffer = await file.arrayBuffer();
       const blob = new Blob([arrayBuffer], { type: file.type });
       
-      // Convert blob to base64 for storage
       const base64data = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onloadend = () => {
@@ -249,31 +271,25 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
         reader.readAsDataURL(blob);
       });
       
-      // Generate ID and store the audio
       const audioId = generateId();
       localStorage.setItem(`audio-${audioId}`, base64data);
       
-      // Create a new audio element to get the duration
       const audio = new Audio();
       audio.src = URL.createObjectURL(blob);
       
-      // Wait for the metadata to load to get the duration
       await new Promise<void>((resolve) => {
         audio.onloadedmetadata = () => {
           const duration = audio.duration;
           
-          // Create a new recording
           const recording: Omit<Recording, 'id' | 'name'> = {
             audioUrl: audioId,
             duration,
-            timestamp: 0, // Default to the beginning of the note
+            timestamp: 0,
             createdAt: Date.now()
           };
           
-          // Use the file name as the recording name if possible
-          const fileName = file.name.replace(/\.[^/.]+$/, ""); // Remove extension
+          const fileName = file.name.replace(/\.[^/.]+$/, "");
           
-          // Save the recording with the name
           saveRecording(noteId, recording, fileName || undefined);
           resolve();
         };
@@ -298,7 +314,6 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
       
-      // Create a download link for the audio
       const a = document.createElement('a');
       a.href = audioData;
       a.download = `${recording.name || 'recording'}.webm`;
@@ -328,8 +343,6 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const selectAllNotes = (folderId?: string) => {
-    // If folderId is provided, select all notes in that folder
-    // Otherwise, select all notes
     const notesToSelect = folderId 
       ? notes.filter(note => note.folderId === folderId)
       : notes;
@@ -347,15 +360,13 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
           : note
       );
       
-      saveNotes(updatedNotes);
-      
-      // Update current note if it's one of the moved notes
-      if (currentNote && selectedNoteIds.includes(currentNote.id)) {
-        const updatedCurrentNote = updatedNotes.find(note => note.id === currentNote.id);
-        if (updatedCurrentNote) {
-          setCurrentNote(updatedCurrentNote);
-        }
-      }
+      updatedNotes
+        .filter(note => note.synced && selectedNoteIds.includes(note.id))
+        .forEach(note => {
+          syncNote(note.id).catch(error => {
+            console.error('Failed to sync updated note:', error);
+          });
+        });
       
       return updatedNotes;
     });
@@ -367,10 +378,15 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const deleteSelectedNotes = () => {
     if (selectedNoteIds.length === 0) return;
     
-    // Clean up recordings for all selected notes
     selectedNoteIds.forEach(noteId => {
       const noteToDelete = notes.find(note => note.id === noteId);
       if (noteToDelete) {
+        if (noteToDelete.synced) {
+          unsyncNote(noteId).catch(error => {
+            console.error('Failed to unsync deleted note:', error);
+          });
+        }
+        
         noteToDelete.recordings.forEach(recording => {
           removeAudioFromStorage(`audio-${recording.audioUrl}`);
         });
@@ -379,22 +395,151 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     setNotes(prevNotes => {
       const updatedNotes = prevNotes.filter(note => !selectedNoteIds.includes(note.id));
-      saveNotes(updatedNotes);
-      
-      // If the current note is deleted, set current note to the first available note or null
-      if (currentNote && selectedNoteIds.includes(currentNote.id)) {
-        if (updatedNotes.length > 0) {
-          setCurrentNote(updatedNotes[0]);
-        } else {
-          setCurrentNote(null);
-        }
+      return updatedNotes;
+    });
+    
+    if (currentNote && selectedNoteIds.includes(currentNote.id)) {
+      const remainingNotes = notes.filter(note => !selectedNoteIds.includes(note.id));
+      if (remainingNotes.length > 0) {
+        setCurrentNote(remainingNotes[0]);
+      } else {
+        setCurrentNote(null);
       }
+    }
+    
+    toast.success(`Deleted ${selectedNoteIds.length} note${selectedNoteIds.length > 1 ? 's' : ''}`);
+    clearNoteSelection();
+  };
+
+  const toggleNoteSync = (noteId: string) => {
+    setNotes(prevNotes => {
+      const updatedNotes = prevNotes.map(note => {
+        if (note.id === noteId) {
+          const willBeSynced = !note.synced;
+          
+          if (willBeSynced) {
+            syncNote(noteId).catch(error => {
+              console.error('Failed to sync note:', error);
+              toast.error('Failed to sync note to cloud');
+            });
+          } else {
+            unsyncNote(noteId).catch(error => {
+              console.error('Failed to unsync note:', error);
+              toast.error('Failed to unsync note from cloud');
+            });
+          }
+          
+          return { ...note, synced: willBeSynced };
+        }
+        return note;
+      });
+      
+      return updatedNotes;
+    });
+  };
+
+  const toggleSelectedNotesSync = (synced: boolean) => {
+    if (selectedNoteIds.length === 0) return;
+    
+    setNotes(prevNotes => {
+      const updatedNotes = prevNotes.map(note => {
+        if (selectedNoteIds.includes(note.id)) {
+          if (note.synced !== synced) {
+            if (synced) {
+              syncNote(note.id).catch(error => {
+                console.error('Failed to sync note:', error);
+              });
+            } else {
+              unsyncNote(note.id).catch(error => {
+                console.error('Failed to unsync note:', error);
+              });
+            }
+            
+            return { ...note, synced };
+          }
+        }
+        return note;
+      });
       
       return updatedNotes;
     });
     
-    toast.success(`Deleted ${selectedNoteIds.length} note${selectedNoteIds.length > 1 ? 's' : ''}`);
+    toast.success(`${synced ? 'Synced' : 'Unsynced'} ${selectedNoteIds.length} note${selectedNoteIds.length > 1 ? 's' : ''}`);
     clearNoteSelection();
+  };
+
+  const getSyncedNotes = async (): Promise<void> => {
+    try {
+      const cloudSyncedData = localStorage.getItem(CLOUD_SYNC_KEY);
+      if (!cloudSyncedData) return;
+      
+      const cloudNotes: Note[] = JSON.parse(cloudSyncedData);
+      
+      setNotes(prevNotes => {
+        const existingNotesMap = new Map(
+          prevNotes.map(note => [note.id, note])
+        );
+        
+        cloudNotes.forEach(cloudNote => {
+          if (existingNotesMap.has(cloudNote.id)) {
+            const localNote = existingNotesMap.get(cloudNote.id)!;
+            if (cloudNote.updatedAt > localNote.updatedAt) {
+              existingNotesMap.set(cloudNote.id, { ...cloudNote, synced: true });
+            }
+          } else {
+            existingNotesMap.set(cloudNote.id, { ...cloudNote, synced: true });
+          }
+        });
+        
+        return Array.from(existingNotesMap.values());
+      });
+    } catch (error) {
+      console.error('Failed to get synced notes:', error);
+      toast.error('Failed to retrieve cloud notes');
+      throw error;
+    }
+  };
+
+  const syncNote = async (noteId: string): Promise<void> => {
+    try {
+      const noteToSync = notes.find(note => note.id === noteId);
+      if (!noteToSync) {
+        throw new Error(`Note with ID ${noteId} not found`);
+      }
+      
+      const cloudSyncedData = localStorage.getItem(CLOUD_SYNC_KEY);
+      const cloudNotes: Note[] = cloudSyncedData ? JSON.parse(cloudSyncedData) : [];
+      
+      const noteIndex = cloudNotes.findIndex(note => note.id === noteId);
+      if (noteIndex >= 0) {
+        cloudNotes[noteIndex] = { ...noteToSync, synced: true };
+      } else {
+        cloudNotes.push({ ...noteToSync, synced: true });
+      }
+      
+      localStorage.setItem(CLOUD_SYNC_KEY, JSON.stringify(cloudNotes));
+    } catch (error) {
+      console.error('Failed to sync note:', error);
+      toast.error('Failed to sync note to cloud');
+      throw error;
+    }
+  };
+
+  const unsyncNote = async (noteId: string): Promise<void> => {
+    try {
+      const cloudSyncedData = localStorage.getItem(CLOUD_SYNC_KEY);
+      if (!cloudSyncedData) return;
+      
+      const cloudNotes: Note[] = JSON.parse(cloudSyncedData);
+      
+      const updatedCloudNotes = cloudNotes.filter(note => note.id !== noteId);
+      
+      localStorage.setItem(CLOUD_SYNC_KEY, JSON.stringify(updatedCloudNotes));
+    } catch (error) {
+      console.error('Failed to unsync note:', error);
+      toast.error('Failed to unsync note from cloud');
+      throw error;
+    }
   };
 
   const contextValue: NoteContextType = {
@@ -418,7 +563,12 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
     clearNoteSelection,
     selectAllNotes,
     moveSelectedNotesToFolder,
-    deleteSelectedNotes
+    deleteSelectedNotes,
+    toggleNoteSync,
+    toggleSelectedNotesSync,
+    getSyncedNotes,
+    syncNote,
+    unsyncNote
   };
 
   return (

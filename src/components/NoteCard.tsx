@@ -3,103 +3,111 @@ import React from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { Note } from '@/types';
 import { useNotes } from '@/context/NoteContext';
-import { CheckSquare, Square, Headphones, Trash2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Headphones, Cloud, CloudOff } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface NoteCardProps {
   note: Note;
-  isActive: boolean;
+  isSelected?: boolean;
+  multiSelectMode?: boolean;
+  onCtrlClick?: (e: React.MouseEvent, noteId: string) => void;
 }
 
-const NoteCard: React.FC<NoteCardProps> = ({ note, isActive }) => {
+const NoteCard: React.FC<NoteCardProps> = ({ 
+  note, 
+  isSelected = false,
+  multiSelectMode = false,
+  onCtrlClick
+}) => {
   const { 
+    currentNote, 
     setCurrentNote, 
-    selectedNoteIds, 
-    toggleNoteSelection,
-    deleteNote
+    toggleNoteSelection, 
+    toggleNoteSync 
   } = useNotes();
   
-  const isSelected = selectedNoteIds.includes(note.id);
-  const hasRecordings = note.recordings.length > 0;
+  const isActive = currentNote?.id === note.id;
   
   const handleClick = (e: React.MouseEvent) => {
-    if (selectedNoteIds.length > 0) {
-      // If we're in selection mode, toggle this note's selection
-      e.preventDefault();
+    // Handle Ctrl+click for multiple selection
+    if (e.ctrlKey && onCtrlClick) {
+      onCtrlClick(e, note.id);
+      return;
+    }
+    
+    if (multiSelectMode) {
       toggleNoteSelection(note.id);
     } else {
-      // Otherwise, select this note
       setCurrentNote(note);
     }
   };
   
-  const handleCheckboxClick = (e: React.MouseEvent) => {
+  const handleSyncToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
-    toggleNoteSelection(note.id);
-  };
-
-  const handleDelete = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (window.confirm('Are you sure you want to delete this note?')) {
-      deleteNote(note.id);
-    }
+    toggleNoteSync(note.id);
   };
   
   return (
-    <div
-      className={`p-3 mb-1 rounded-md cursor-pointer flex items-start group transition-colors ${
-        isActive
-          ? 'bg-accent text-accent-foreground'
-          : isSelected
-          ? 'bg-accent/30 hover:bg-accent/60'
-          : 'hover:bg-accent/10'
-      }`}
+    <div 
+      className={cn(
+        "p-3 rounded-lg transition-colors cursor-pointer relative group",
+        isActive ? "bg-accent" : "hover:bg-accent/50",
+        isSelected && "bg-accent/80"
+      )}
       onClick={handleClick}
     >
-      <div 
-        className={`mr-2 mt-1 flex-shrink-0 ${selectedNoteIds.length === 0 ? 'invisible group-hover:visible' : 'visible'}`}
-        onClick={handleCheckboxClick}
-      >
-        {isSelected ? (
-          <CheckSquare size={16} className="text-primary" />
-        ) : (
-          <Square size={16} />
-        )}
-      </div>
-      
-      <div className="flex-1 min-w-0">
-        <div className="flex justify-between items-start">
-          <div className="font-medium truncate">{note.title || "Untitled Note"}</div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 hover:text-destructive -mr-1"
-            onClick={handleDelete}
-          >
-            <Trash2 size={14} />
-          </Button>
-        </div>
-        
-        <div className="flex items-center mt-1 text-xs text-muted-foreground">
-          <span className="truncate">
-            {note.content
-              ? note.content.substring(0, 50) + (note.content.length > 50 ? '...' : '')
-              : 'No content'}
-          </span>
-        </div>
-        
-        <div className="flex items-center justify-between mt-1">
-          <span className="text-xs text-muted-foreground">
-            {formatDistanceToNow(note.updatedAt, { addSuffix: true })}
-          </span>
-          
-          {hasRecordings && (
-            <div className="flex items-center text-xs text-muted-foreground">
-              <Headphones size={12} className="mr-1" />
-              {note.recordings.length}
+      <div className="flex items-start justify-between">
+        <div className="flex-1 min-w-0">
+          {multiSelectMode && (
+            <div className="absolute top-3 left-3">
+              <Checkbox 
+                checked={isSelected} 
+                onCheckedChange={() => toggleNoteSelection(note.id)}
+                onClick={(e) => e.stopPropagation()}
+              />
             </div>
           )}
+          
+          <h3 className={cn(
+            "font-medium truncate",
+            multiSelectMode && "ml-7"
+          )}>
+            {note.title || "Untitled Note"}
+          </h3>
+          
+          <p className="text-sm text-muted-foreground line-clamp-2 mt-1 break-words">
+            {note.content || "No content"}
+          </p>
+          
+          <div className="flex items-center mt-2 text-xs text-muted-foreground">
+            <span className="truncate">
+              {formatDistanceToNow(note.updatedAt, { addSuffix: true })}
+            </span>
+            
+            {note.recordings.length > 0 && (
+              <div className="flex items-center ml-2">
+                <Headphones size={14} className="mr-1" />
+                <span>{note.recordings.length}</span>
+              </div>
+            )}
+          </div>
         </div>
+        
+        <button 
+          className={cn(
+            "p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity",
+            note.synced && "opacity-100"
+          )}
+          onClick={handleSyncToggle}
+          title={note.synced ? "Remove from cloud sync" : "Sync to cloud"}
+        >
+          {note.synced ? (
+            <Cloud size={16} className="text-primary" />
+          ) : (
+            <CloudOff size={16} className="text-muted-foreground" />
+          )}
+        </button>
       </div>
     </div>
   );

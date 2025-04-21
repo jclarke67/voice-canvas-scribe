@@ -2,103 +2,132 @@
 import React from 'react';
 import { useNotes } from '@/context/NoteContext';
 import { Button } from '@/components/ui/button';
-import { 
-  FolderPlus, 
-  Trash2, 
-  CheckSquare, 
-  X, 
-  FolderOpen 
-} from 'lucide-react';
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuTrigger,
+import { Folder, Trash2, CloudUpload, CloudOff } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator
+  DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useState } from 'react';
 
 const MultiSelectControls: React.FC = () => {
   const { 
     selectedNoteIds, 
     clearNoteSelection, 
-    selectAllNotes, 
+    folders, 
     moveSelectedNotesToFolder, 
     deleteSelectedNotes, 
-    folders 
+    toggleSelectedNotesSync 
   } = useNotes();
   
-  if (selectedNoteIds.length === 0) {
-    return null;
-  }
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  
+  const handleMoveToFolder = (folderId?: string) => {
+    moveSelectedNotesToFolder(folderId);
+  };
+  
+  const handleDeleteSelected = () => {
+    setShowDeleteConfirm(true);
+  };
+  
+  const confirmDelete = () => {
+    deleteSelectedNotes();
+    setShowDeleteConfirm(false);
+  };
+  
+  const handleSyncSelected = () => {
+    toggleSelectedNotesSync(true);
+  };
+  
+  const handleUnsyncSelected = () => {
+    toggleSelectedNotesSync(false);
+  };
   
   return (
-    <div className="bg-accent/30 p-2 rounded-md mb-3 animate-fade-in">
-      <div className="flex items-center justify-between mb-2">
-        <div className="font-medium text-sm">
-          {selectedNoteIds.length} selected
-        </div>
+    <div className="flex items-center justify-between p-2 bg-muted/50 rounded-md mb-2">
+      <div>
+        <span className="text-sm font-medium">{selectedNoteIds.length} selected</span>
         <Button 
           variant="ghost" 
           size="sm" 
           onClick={clearNoteSelection}
-          className="h-7 w-7 p-0"
+          className="ml-2 text-xs"
         >
-          <X size={14} />
+          Clear
         </Button>
       </div>
       
-      <div className="flex flex-wrap gap-2">
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={() => selectAllNotes()}
-          className="text-xs"
-        >
-          <CheckSquare size={14} className="mr-1" />
-          Select All
-        </Button>
-        
+      <div className="flex gap-1">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button 
-              variant="outline" 
-              size="sm"
-              className="text-xs"
-            >
-              <FolderOpen size={14} className="mr-1" />
-              Move to
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+              <Folder size={16} />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem onClick={() => moveSelectedNotesToFolder(undefined)}>
-              <FolderPlus size={14} className="mr-2" />
-              Unfiled
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={() => handleMoveToFolder()}>
+              Move to Unfiled
             </DropdownMenuItem>
-            
-            {folders.length > 0 && <DropdownMenuSeparator />}
-            
             {folders.map(folder => (
-              <DropdownMenuItem 
-                key={folder.id}
-                onClick={() => moveSelectedNotesToFolder(folder.id)}
-              >
-                <FolderOpen size={14} className="mr-2" />
-                {folder.name}
+              <DropdownMenuItem key={folder.id} onSelect={() => handleMoveToFolder(folder.id)}>
+                Move to {folder.name}
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
         
         <Button 
-          variant="outline" 
-          size="sm"
-          className="text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
-          onClick={deleteSelectedNotes}
+          variant="ghost" 
+          size="sm" 
+          className="h-8 w-8 p-0" 
+          onClick={handleSyncSelected}
+          title="Sync selected notes to cloud"
         >
-          <Trash2 size={14} className="mr-1" />
-          Delete
+          <CloudUpload size={16} />
+        </Button>
+        
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="h-8 w-8 p-0" 
+          onClick={handleUnsyncSelected}
+          title="Remove selected notes from cloud sync"
+        >
+          <CloudOff size={16} />
+        </Button>
+        
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="h-8 w-8 p-0" 
+          onClick={handleDeleteSelected}
+          title="Delete selected notes"
+        >
+          <Trash2 size={16} className="text-destructive" />
         </Button>
       </div>
+      
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete {selectedNoteIds.length} notes?</DialogTitle>
+            <DialogDescription>
+              This action cannot be undone. All selected notes and their recordings will be permanently deleted.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDelete}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

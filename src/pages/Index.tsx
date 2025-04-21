@@ -5,13 +5,13 @@ import Sidebar from '@/components/Sidebar';
 import NoteEditor from '@/components/NoteEditor';
 import EmptyState from '@/components/EmptyState';
 import KeyboardShortcutsHelp from '@/components/KeyboardShortcutsHelp';
-import { Menu, Plus, HelpCircle } from 'lucide-react';
+import { Menu, Plus, HelpCircle, Cloud } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useTheme } from '@/App';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 
 const NoteContainer = () => {
-  const { notes, currentNote, createNote } = useNotes();
+  const { notes, currentNote, createNote, selectedNoteIds, toggleNoteSelection, clearNoteSelection } = useNotes();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const isMobile = useIsMobile();
@@ -41,11 +41,16 @@ const NoteContainer = () => {
       if (e.key === '?') {
         setShowKeyboardHelp(true);
       }
+      
+      // Clear selection when Escape is pressed
+      if (e.key === 'Escape' && selectedNoteIds.length > 0) {
+        clearNoteSelection();
+      }
     };
     
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [setTheme, theme]);
+  }, [setTheme, theme, selectedNoteIds.length, clearNoteSelection]);
   
   const toggleSidebar = () => {
     setSidebarOpen(prev => !prev);
@@ -53,6 +58,11 @@ const NoteContainer = () => {
   
   const handleCreateNote = () => {
     createNote();
+  };
+  
+  const handleNoteCtrlClick = (e: React.MouseEvent, noteId: string) => {
+    e.preventDefault();
+    toggleNoteSelection(noteId);
   };
   
   return (
@@ -71,7 +81,11 @@ const NoteContainer = () => {
               // This makes the panel resize correctly on mobile
               style={{ minWidth: isMobile ? '180px' : '200px' }}
             >
-              <Sidebar isOpen={sidebarOpen} toggleSidebar={toggleSidebar} />
+              <Sidebar 
+                isOpen={sidebarOpen} 
+                toggleSidebar={toggleSidebar} 
+                onNoteCtrlClick={handleNoteCtrlClick}
+              />
             </ResizablePanel>
             <ResizableHandle withHandle />
           </>
@@ -89,7 +103,7 @@ const NoteContainer = () => {
               </button>
             )}
             
-            <div className="absolute top-4 right-4 z-10">
+            <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
               <button 
                 onClick={() => setShowKeyboardHelp(true)}
                 className="p-2 rounded-md bg-background border shadow-sm hover:bg-accent transition-colors"

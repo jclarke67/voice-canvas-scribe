@@ -1,3 +1,4 @@
+
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { saveAudioToStorage } from '@/lib/storage';
 
@@ -33,6 +34,28 @@ export const useAudioRecorder = () => {
           timerRef.current = window.setInterval(() => {
             setRecordingTime(Math.floor((Date.now() - startTimeRef.current) / 1000));
           }, 1000);
+          
+          // Auto-restart recording
+          navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(stream => {
+              const mediaRecorder = new MediaRecorder(stream);
+              mediaRecorderRef.current = mediaRecorder;
+              audioChunksRef.current = [];
+              
+              mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                  audioChunksRef.current.push(event.data);
+                }
+              };
+              
+              mediaRecorder.start();
+              setPermissionStatus('granted');
+            })
+            .catch(error => {
+              console.error('Failed to restart recording after refresh:', error);
+              setIsRecording(false);
+              sessionStorage.removeItem('voice-canvas-recording-state');
+            });
         }
       } catch (error) {
         console.error('Failed to parse recording state:', error);
@@ -40,11 +63,22 @@ export const useAudioRecorder = () => {
       }
     }
 
+    // Add beforeunload event to auto-save recording on page refresh
+    const handleBeforeUnload = () => {
+      if (isRecording && mediaRecorderRef.current) {
+        // Force the media recorder to stop and save data
+        mediaRecorderRef.current.stop();
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
     // Clean up on unmount
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
+      window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, []);
 
@@ -127,44 +161,35 @@ export const useAudioRecorder = () => {
       
       mediaRecorderRef.current.onstop = async () => {
         try {
+          // Only process if we have chunks
+          if (audioChunksRef.current.length === 0) {
+            resolve(null);
+            return;
+          }
+          
           const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
           
           // Convert blob to base64 and save it
-          const reader = new FileReader();
-          reader.onloadend = async () => {
-            try {
-              const base64data = reader.result as string;
-              const audioId = Math.random().toString(36).substring(2, 15);
-              localStorage.setItem(`audio-${audioId}`, base64data);
-              
-              // Stop all tracks in the stream
-              mediaRecorderRef.current?.stream.getTracks().forEach(track => track.stop());
-              
-              // Clear the recording timer
-              if (timerRef.current) {
-                clearInterval(timerRef.current);
-                timerRef.current = null;
-              }
-              
-              setIsRecording(false);
-              setRecordingTime(0);
+          const audioId = await saveAudioToStorage(audioBlob);
+          
+          // Stop all tracks in the stream
+          mediaRecorderRef.current?.stream.getTracks().forEach(track => track.stop());
+          
+          // Clear the recording timer
+          if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+          }
+          
+          setIsRecording(false);
+          setRecordingTime(0);
 
-              // Clear recording state from session storage
-              sessionStorage.removeItem('voice-canvas-recording-state');
-              
-              resolve({ audioUrl: audioId, duration });
-            } catch (error) {
-              console.error('Error saving audio:', error);
-              resolve(null);
-            }
-          };
-          reader.onerror = () => {
-            console.error('Error reading audio blob');
-            resolve(null);
-          };
-          reader.readAsDataURL(audioBlob);
+          // Clear recording state from session storage
+          sessionStorage.removeItem('voice-canvas-recording-state');
+          
+          resolve({ audioUrl: audioId, duration });
         } catch (error) {
-          console.error('Error creating audio blob:', error);
+          console.error('Error saving audio:', error);
           resolve(null);
         }
       };

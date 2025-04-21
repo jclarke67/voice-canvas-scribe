@@ -8,6 +8,7 @@ export interface Note {
   updatedAt: number;
   recordings: Recording[];
   folderId?: string; // Optional folder association
+  synced?: boolean;  // Whether the note is synced to cloud
 }
 
 export interface Recording {
@@ -48,4 +49,10 @@ export type NoteContextType = {
   selectAllNotes: (folderId?: string) => void;
   moveSelectedNotesToFolder: (folderId?: string) => void;
   deleteSelectedNotes: () => void;
+  // Add new types for syncing
+  toggleNoteSync: (noteId: string) => void;
+  toggleSelectedNotesSync: (synced: boolean) => void;
+  getSyncedNotes: () => Promise<void>;
+  syncNote: (noteId: string) => Promise<void>;
+  unsyncNote: (noteId: string) => Promise<void>;
 };
