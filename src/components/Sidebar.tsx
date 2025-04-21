@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useNotes } from '@/context/NoteContext';
 import NoteCard from './NoteCard';
-import { Plus, Search, Menu, FolderPlus, Folder, ChevronDown, ChevronRight, FileDown, Trash2 } from 'lucide-react';
+import { Plus, Search, Menu, FolderPlus, Folder, ChevronDown, ChevronRight, FileDown, Trash2, Tag, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ThemeToggle from './ThemeToggle';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
@@ -11,6 +11,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { exportFolderAsPDF, exportNotesAsPDF } from '@/lib/exportUtils';
 import { toast } from 'sonner';
 import MultiSelectControls from './MultiSelectControls';
+import TagsList from './TagsList';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -30,19 +31,33 @@ const Sidebar: React.FC<SidebarProps> = ({
     selectedNoteIds,
     createNote,
     deleteFolder,
-    updateFolder
+    updateFolder,
+    getNotesWithTag
   } = useNotes();
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    folders: true,
+    tags: true,
+    unfiled: true
+  });
   const [showFolderManager, setShowFolderManager] = useState(false);
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
   const [editingFolderName, setEditingFolderName] = useState('');
   const [multiSelectMode, setMultiSelectMode] = useState(false);
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
 
   const toggleFolder = (folderId: string) => {
     setExpandedFolders(prev => ({
       ...prev,
       [folderId]: !prev[folderId]
+    }));
+  };
+
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
     }));
   };
 
@@ -71,11 +86,16 @@ const Sidebar: React.FC<SidebarProps> = ({
     exportNotesAsPDF(notes, 'All Notes');
   };
 
-  const filteredNotes = searchTerm 
+  let filteredNotes = searchTerm 
     ? notes.filter(note => 
         note.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
         note.content.toLowerCase().includes(searchTerm.toLowerCase()))
     : notes;
+  
+  // If a tag is selected, filter notes by that tag
+  if (selectedTag && !searchTerm) {
+    filteredNotes = getNotesWithTag(selectedTag);
+  }
   
   const sortedNotes = [...filteredNotes].sort((a, b) => b.updatedAt - a.updatedAt);
   const unfilteredNotes = sortedNotes.filter(note => !note.folderId);
@@ -104,6 +124,14 @@ const Sidebar: React.FC<SidebarProps> = ({
     setMultiSelectMode(prev => !prev);
   };
 
+  const handleSelectTag = (tag: string) => {
+    if (selectedTag === tag) {
+      setSelectedTag(null);
+    } else {
+      setSelectedTag(tag);
+    }
+  };
+
   return (
     <div className="h-full flex flex-col bg-background border-r">
       <div className="flex items-center justify-between p-4 border-b">
@@ -124,7 +152,10 @@ const Sidebar: React.FC<SidebarProps> = ({
             <input
               type="text"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setSelectedTag(null); // Clear selected tag when searching
+              }}
               placeholder="Search notes..."
               className="w-full h-9 px-3 py-2 text-sm bg-background border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
             />
@@ -150,82 +181,29 @@ const Sidebar: React.FC<SidebarProps> = ({
             <p className="text-sm">Try a different search term</p>
           </div>
         )}
-        
-        {!searchTerm && (
-          <div className="mb-2 flex justify-between items-center">
-            <div className="text-sm font-medium text-muted-foreground px-2 py-1">Folders</div>
-            <div className="flex space-x-1">
-              <button onClick={handleExportAllNotes} className="p-1 rounded-md hover:bg-accent text-muted-foreground" title="Export all notes">
-                <FileDown size={16} />
-              </button>
-              <button onClick={() => setShowFolderManager(true)} className="p-1 rounded-md hover:bg-accent text-muted-foreground" title="Manage folders">
-                <FolderPlus size={16} />
-              </button>
+
+        {selectedTag && (
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2 px-2 py-1 bg-accent rounded-md">
+                <Tag size={14} className="text-primary" />
+                <span className="text-sm font-medium">{selectedTag}</span>
+                <button 
+                  onClick={() => setSelectedTag(null)}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <X size={14} />
+                </button>
+              </div>
             </div>
-          </div>
-        )}
-        
-        {!searchTerm && folders.map(folder => (
-          <Collapsible 
-            key={folder.id} 
-            open={expandedFolders[folder.id]} 
-            onOpenChange={() => toggleFolder(folder.id)} 
-            className="mb-1"
-          >
-            <CollapsibleTrigger className="w-full flex items-center justify-between p-2 hover:bg-accent/50 rounded-md">
-              <div className="flex items-center text-sm flex-1">
-                <Folder size={16} className="mr-2 text-primary" />
-                {editingFolderId === folder.id ? (
-                  <form onSubmit={handleSaveFolder} className="flex-1">
-                    <input 
-                      type="text" 
-                      value={editingFolderName} 
-                      onChange={e => setEditingFolderName(e.target.value)} 
-                      onBlur={handleSaveFolder} 
-                      className="w-full bg-background px-2 py-1 rounded-md text-sm" 
-                      autoFocus 
-                    />
-                  </form>
-                ) : (
-                  <>
-                    <span 
-                      onDoubleClick={e => handleStartEditingFolder(folder.id, folder.name, e)} 
-                      className="flex-1"
-                    >
-                      {folder.name}
-                    </span>
-                    <span className="ml-2 text-xs text-muted-foreground">
-                      ({folderNotes[folder.id]?.length || 0})
-                    </span>
-                  </>
-                )}
-              </div>
-              
-              <div className="flex items-center space-x-1">
-                <button 
-                  onClick={e => handleExportFolder(folder.id, e)} 
-                  className="p-1 rounded-md hover:bg-accent text-muted-foreground" 
-                  title="Export folder"
-                >
-                  <FileDown size={14} />
-                </button>
-                <button 
-                  onClick={e => handleDeleteFolder(folder.id, e)} 
-                  className="p-1 rounded-md hover:bg-accent text-muted-foreground hover:text-destructive" 
-                  title="Delete folder"
-                >
-                  <Trash2 size={14} />
-                </button>
-                {expandedFolders[folder.id] ? (
-                  <ChevronDown size={16} className="text-muted-foreground" />
-                ) : (
-                  <ChevronRight size={16} className="text-muted-foreground" />
-                )}
-              </div>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="ml-4 mt-1 space-y-1">
-              {folderNotes[folder.id]?.length > 0 ? (
-                folderNotes[folder.id].map(note => (
+            
+            <div className="space-y-1">
+              {sortedNotes.length === 0 ? (
+                <div className="text-xs text-muted-foreground p-2">
+                  No notes with this tag
+                </div>
+              ) : (
+                sortedNotes.map(note => (
                   <NoteCard 
                     key={note.id} 
                     note={note} 
@@ -234,68 +212,201 @@ const Sidebar: React.FC<SidebarProps> = ({
                     onCtrlClick={onNoteCtrlClick}
                   />
                 ))
-              ) : (
-                <div className="text-xs text-muted-foreground p-2">
-                  No notes in this folder
-                </div>
               )}
-              <button 
-                onClick={() => createNote(folder.id)} 
-                className="w-full text-left text-xs p-2 text-muted-foreground hover:bg-accent/50 rounded-md flex items-center"
-              >
-                <Plus size={14} className="mr-1" />
-                New note in this folder
-              </button>
-            </CollapsibleContent>
-          </Collapsible>
-        ))}
-        
-        {!searchTerm && (
-          <div className="mb-2 mt-4 flex justify-between items-center">
-            <div className="text-sm font-medium text-muted-foreground px-2 py-1">
-              Unfiled Notes
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="p-1 rounded-md hover:bg-accent text-muted-foreground" title="Export unfiled notes">
-                  <FileDown size={16} />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => exportNotesAsPDF(unfilteredNotes, 'Unfiled Notes')}>
-                  Export as PDF
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
         )}
         
-        {searchTerm ? 
-          sortedNotes.map(note => (
-            <NoteCard 
-              key={note.id} 
-              note={note} 
-              isSelected={selectedNoteIds.includes(note.id)}
-              multiSelectMode={multiSelectMode}
-              onCtrlClick={onNoteCtrlClick}
-            />
-          )) 
-          : 
-          unfilteredNotes.map(note => (
-            <NoteCard 
-              key={note.id} 
-              note={note} 
-              isSelected={selectedNoteIds.includes(note.id)}
-              multiSelectMode={multiSelectMode}
-              onCtrlClick={onNoteCtrlClick}
-            />
-          ))
-        }
-        
-        {!searchTerm && unfilteredNotes.length === 0 && (
-          <div className="text-xs text-muted-foreground p-2">
-            No unfiled notes
-          </div>
+        {!searchTerm && !selectedTag && (
+          <>
+            {/* Tags Section */}
+            <Collapsible 
+              open={expandedSections.tags}
+              onOpenChange={() => toggleSection('tags')}
+              className="mb-4"
+            >
+              <CollapsibleTrigger className="w-full flex items-center justify-between p-2 hover:bg-accent/50 rounded-md">
+                <div className="text-sm font-medium flex items-center">
+                  <Tag size={16} className="mr-2 text-primary" />
+                  Tags
+                </div>
+                {expandedSections.tags ? (
+                  <ChevronDown size={16} className="text-muted-foreground" />
+                ) : (
+                  <ChevronRight size={16} className="text-muted-foreground" />
+                )}
+              </CollapsibleTrigger>
+              
+              <CollapsibleContent className="ml-4 mt-1">
+                <TagsList onSelectTag={handleSelectTag} activeTag={selectedTag} />
+              </CollapsibleContent>
+            </Collapsible>
+            
+            {/* Folders Section */}
+            <Collapsible 
+              open={expandedSections.folders}
+              onOpenChange={() => toggleSection('folders')}
+              className="mb-4"
+            >
+              <CollapsibleTrigger className="w-full flex items-center justify-between p-2 hover:bg-accent/50 rounded-md">
+                <div className="text-sm font-medium flex items-center">
+                  <Folder size={16} className="mr-2 text-primary" />
+                  Folders
+                </div>
+                <div className="flex space-x-1">
+                  <button onClick={handleExportAllNotes} className="p-1 rounded-md hover:bg-accent text-muted-foreground" title="Export all notes">
+                    <FileDown size={16} />
+                  </button>
+                  <button onClick={() => setShowFolderManager(true)} className="p-1 rounded-md hover:bg-accent text-muted-foreground" title="Manage folders">
+                    <FolderPlus size={16} />
+                  </button>
+                  {expandedSections.folders ? (
+                    <ChevronDown size={16} className="text-muted-foreground" />
+                  ) : (
+                    <ChevronRight size={16} className="text-muted-foreground" />
+                  )}
+                </div>
+              </CollapsibleTrigger>
+              
+              <CollapsibleContent className="ml-4 mt-1">
+                {folders.map(folder => (
+                  <Collapsible 
+                    key={folder.id} 
+                    open={expandedFolders[folder.id]} 
+                    onOpenChange={() => toggleFolder(folder.id)} 
+                    className="mb-1"
+                  >
+                    <CollapsibleTrigger className="w-full flex items-center justify-between p-2 hover:bg-accent/50 rounded-md">
+                      <div className="flex items-center text-sm flex-1">
+                        <Folder size={16} className="mr-2 text-primary" />
+                        {editingFolderId === folder.id ? (
+                          <form onSubmit={handleSaveFolder} className="flex-1">
+                            <input 
+                              type="text" 
+                              value={editingFolderName} 
+                              onChange={e => setEditingFolderName(e.target.value)} 
+                              onBlur={handleSaveFolder} 
+                              className="w-full bg-background px-2 py-1 rounded-md text-sm" 
+                              autoFocus 
+                            />
+                          </form>
+                        ) : (
+                          <>
+                            <span 
+                              onDoubleClick={e => handleStartEditingFolder(folder.id, folder.name, e)} 
+                              className="flex-1"
+                            >
+                              {folder.name}
+                            </span>
+                            <span className="ml-2 text-xs text-muted-foreground">
+                              ({folderNotes[folder.id]?.length || 0})
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      
+                      <div className="flex items-center space-x-1">
+                        <button 
+                          onClick={e => handleExportFolder(folder.id, e)} 
+                          className="p-1 rounded-md hover:bg-accent text-muted-foreground" 
+                          title="Export folder"
+                        >
+                          <FileDown size={14} />
+                        </button>
+                        <button 
+                          onClick={e => handleDeleteFolder(folder.id, e)} 
+                          className="p-1 rounded-md hover:bg-accent text-muted-foreground hover:text-destructive" 
+                          title="Delete folder"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                        {expandedFolders[folder.id] ? (
+                          <ChevronDown size={16} className="text-muted-foreground" />
+                        ) : (
+                          <ChevronRight size={16} className="text-muted-foreground" />
+                        )}
+                      </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="ml-4 mt-1 space-y-1">
+                      {folderNotes[folder.id]?.length > 0 ? (
+                        folderNotes[folder.id].map(note => (
+                          <NoteCard 
+                            key={note.id} 
+                            note={note} 
+                            isSelected={selectedNoteIds.includes(note.id)}
+                            multiSelectMode={multiSelectMode}
+                            onCtrlClick={onNoteCtrlClick}
+                          />
+                        ))
+                      ) : (
+                        <div className="text-xs text-muted-foreground p-2">
+                          No notes in this folder
+                        </div>
+                      )}
+                      <button 
+                        onClick={() => createNote(folder.id)} 
+                        className="w-full text-left text-xs p-2 text-muted-foreground hover:bg-accent/50 rounded-md flex items-center"
+                      >
+                        <Plus size={14} className="mr-1" />
+                        New note in this folder
+                      </button>
+                    </CollapsibleContent>
+                  </Collapsible>
+                ))}
+              </CollapsibleContent>
+            </Collapsible>
+            
+            {/* Unfiled Notes */}
+            <Collapsible 
+              open={expandedSections.unfiled}
+              onOpenChange={() => toggleSection('unfiled')}
+              className="mb-4"
+            >
+              <CollapsibleTrigger className="w-full flex justify-between items-center p-2 hover:bg-accent/50 rounded-md">
+                <div className="text-sm font-medium flex items-center">
+                  <Folder size={16} className="mr-2 text-muted-foreground" />
+                  Unfiled Notes
+                </div>
+                <div className="flex items-center">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="p-1 rounded-md hover:bg-accent text-muted-foreground" title="Export unfiled notes">
+                        <FileDown size={16} />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => exportNotesAsPDF(unfilteredNotes, 'Unfiled Notes')}>
+                        Export as PDF
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  {expandedSections.unfiled ? (
+                    <ChevronDown size={16} className="text-muted-foreground ml-1" />
+                  ) : (
+                    <ChevronRight size={16} className="text-muted-foreground ml-1" />
+                  )}
+                </div>
+              </CollapsibleTrigger>
+              
+              <CollapsibleContent className="mt-1 space-y-1">
+                {unfilteredNotes.length > 0 ? (
+                  unfilteredNotes.map(note => (
+                    <NoteCard 
+                      key={note.id} 
+                      note={note} 
+                      isSelected={selectedNoteIds.includes(note.id)}
+                      multiSelectMode={multiSelectMode}
+                      onCtrlClick={onNoteCtrlClick}
+                    />
+                  ))
+                ) : (
+                  <div className="text-xs text-muted-foreground p-2">
+                    No unfiled notes
+                  </div>
+                )}
+              </CollapsibleContent>
+            </Collapsible>
+          </>
         )}
       </div>
       

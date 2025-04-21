@@ -4,11 +4,20 @@ export interface Note {
   id: string;
   title: string;
   content: string;
+  pages: NotePage[];
+  currentPageIndex: number;
   createdAt: number;
   updatedAt: number;
   recordings: Recording[];
+  tags: string[];
   folderId?: string; // Optional folder association
   synced?: boolean;  // Whether the note is synced to cloud
+}
+
+export interface NotePage {
+  id: string;
+  content: string;
+  recordings: Recording[];
 }
 
 export interface Recording {
@@ -55,4 +64,13 @@ export type NoteContextType = {
   getSyncedNotes: () => Promise<void>;
   syncNote: (noteId: string) => Promise<void>;
   unsyncNote: (noteId: string) => Promise<void>;
+  // Add new types for page navigation
+  addPageToNote: (noteId: string) => void;
+  deletePageFromNote: (noteId: string, pageIndex: number) => void;
+  setCurrentPageIndex: (noteId: string, pageIndex: number) => void;
+  // Add new types for tags
+  addTagToNote: (noteId: string, tag: string) => void;
+  removeTagFromNote: (noteId: string, tag: string) => void;
+  getAllTags: () => string[];
+  getNotesWithTag: (tag: string) => Note[];
 };

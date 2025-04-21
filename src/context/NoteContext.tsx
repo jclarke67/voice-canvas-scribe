@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { Note, NoteContextType, Recording, Folder } from '@/types';
+import { Note, NoteContextType, Recording, Folder, NotePage } from '@/types';
 import { getNotes, saveNotes, createEmptyNote, generateId, getAudioFromStorage, removeAudioFromStorage, getFolders, saveFolders } from '@/lib/storage';
 import { toast } from 'sonner';
 
@@ -19,7 +19,27 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const savedNotes = getNotes();
       const savedFolders = getFolders();
       
-      setNotes(savedNotes);
+      const migratedNotes = savedNotes.map(note => {
+        if (!note.pages || note.pages.length === 0) {
+          return {
+            ...note,
+            pages: [{
+              id: generateId(),
+              content: note.content,
+              recordings: [...note.recordings]
+            }],
+            currentPageIndex: 0,
+            tags: note.tags || []
+          };
+        }
+        return {
+          ...note,
+          tags: note.tags || [],
+          currentPageIndex: note.currentPageIndex || 0
+        };
+      });
+      
+      setNotes(migratedNotes);
       setFolders(savedFolders);
       
       try {
@@ -28,8 +48,8 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error('Failed to load synced notes:', error);
       }
       
-      if (savedNotes.length > 0) {
-        setCurrentNote(savedNotes[0]);
+      if (migratedNotes.length > 0) {
+        setCurrentNote(migratedNotes[0]);
       }
       
       setIsInitialized(true);
@@ -45,7 +65,18 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [notes, isInitialized]);
 
   const createNote = (folderId?: string) => {
-    const newNote = createEmptyNote(folderId);
+    const initialPage: NotePage = {
+      id: generateId(),
+      content: '',
+      recordings: []
+    };
+    
+    const newNote = {
+      ...createEmptyNote(folderId),
+      pages: [initialPage],
+      currentPageIndex: 0,
+      tags: []
+    };
     
     setNotes(prevNotes => {
       const updatedNotes = [...prevNotes, newNote];
@@ -126,8 +157,19 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setNotes(prevNotes => {
       const updatedNotes = prevNotes.map(note => {
         if (note.id === noteId) {
+          const updatedPages = [...note.pages];
+          const currentPageIndex = note.currentPageIndex || 0;
+          
+          if (updatedPages[currentPageIndex]) {
+            updatedPages[currentPageIndex] = {
+              ...updatedPages[currentPageIndex],
+              recordings: [...updatedPages[currentPageIndex].recordings, recording]
+            };
+          }
+          
           const updatedNote = {
             ...note,
+            pages: updatedPages,
             recordings: [...note.recordings, recording],
             updatedAt: Date.now()
           };
@@ -542,6 +584,174 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const addPageToNote = (noteId: string) => {
+    setNotes(prevNotes => {
+      const updatedNotes = prevNotes.map(note => {
+        if (note.id === noteId) {
+          const newPage: NotePage = {
+            id: generateId(),
+            content: '',
+            recordings: []
+          };
+          
+          const updatedNote = {
+            ...note,
+            pages: [...note.pages, newPage],
+            currentPageIndex: note.pages.length,
+            updatedAt: Date.now()
+          };
+          
+          if (currentNote && currentNote.id === noteId) {
+            setCurrentNote(updatedNote);
+          }
+          
+          return updatedNote;
+        }
+        return note;
+      });
+      
+      return updatedNotes;
+    });
+    toast.success('New page added');
+  };
+
+  const deletePageFromNote = (noteId: string, pageIndex: number) => {
+    setNotes(prevNotes => {
+      const updatedNotes = prevNotes.map(note => {
+        if (note.id === noteId && note.pages.length > 1) {
+          const updatedPages = [...note.pages];
+          const deletedPage = updatedPages[pageIndex];
+          
+          deletedPage.recordings.forEach(recording => {
+            const existsOnOtherPages = updatedPages.some((page, idx) => 
+              idx !== pageIndex && page.recordings.some(rec => rec.id === recording.id)
+            );
+            
+            if (!existsOnOtherPages) {
+              removeAudioFromStorage(`audio-${recording.audioUrl}`);
+            }
+          });
+          
+          updatedPages.splice(pageIndex, 1);
+          
+          let newPageIndex = note.currentPageIndex;
+          if (pageIndex <= note.currentPageIndex) {
+            newPageIndex = Math.max(0, note.currentPageIndex - 1);
+          }
+          
+          const updatedNote = {
+            ...note,
+            pages: updatedPages,
+            currentPageIndex: newPageIndex,
+            updatedAt: Date.now()
+          };
+          
+          if (currentNote && currentNote.id === noteId) {
+            setCurrentNote(updatedNote);
+          }
+          
+          return updatedNote;
+        }
+        return note;
+      });
+      
+      return updatedNotes;
+    });
+    toast.success('Page deleted');
+  };
+
+  const setCurrentPageIndex = (noteId: string, pageIndex: number) => {
+    setNotes(prevNotes => {
+      const updatedNotes = prevNotes.map(note => {
+        if (note.id === noteId) {
+          const updatedNote = {
+            ...note,
+            currentPageIndex: pageIndex
+          };
+          
+          if (currentNote && currentNote.id === noteId) {
+            setCurrentNote(updatedNote);
+          }
+          
+          return updatedNote;
+        }
+        return note;
+      });
+      
+      return updatedNotes;
+    });
+  };
+
+  const addTagToNote = (noteId: string, tag: string) => {
+    if (!tag.trim()) return;
+    
+    setNotes(prevNotes => {
+      const updatedNotes = prevNotes.map(note => {
+        if (note.id === noteId) {
+          if (note.tags && note.tags.includes(tag)) {
+            return note;
+          }
+          
+          const updatedNote = {
+            ...note,
+            tags: [...(note.tags || []), tag],
+            updatedAt: Date.now()
+          };
+          
+          if (currentNote && currentNote.id === noteId) {
+            setCurrentNote(updatedNote);
+          }
+          
+          return updatedNote;
+        }
+        return note;
+      });
+      
+      return updatedNotes;
+    });
+    toast.success(`Tag "${tag}" added`);
+  };
+
+  const removeTagFromNote = (noteId: string, tag: string) => {
+    setNotes(prevNotes => {
+      const updatedNotes = prevNotes.map(note => {
+        if (note.id === noteId && note.tags) {
+          const updatedNote = {
+            ...note,
+            tags: note.tags.filter(t => t !== tag),
+            updatedAt: Date.now()
+          };
+          
+          if (currentNote && currentNote.id === noteId) {
+            setCurrentNote(updatedNote);
+          }
+          
+          return updatedNote;
+        }
+        return note;
+      });
+      
+      return updatedNotes;
+    });
+    toast.success(`Tag "${tag}" removed`);
+  };
+
+  const getAllTags = () => {
+    const allTags = new Set<string>();
+    
+    notes.forEach(note => {
+      if (note.tags) {
+        note.tags.forEach(tag => allTags.add(tag));
+      }
+    });
+    
+    return Array.from(allTags).sort();
+  };
+
+  const getNotesWithTag = (tag: string) => {
+    return notes.filter(note => note.tags && note.tags.includes(tag));
+  };
+
   const contextValue: NoteContextType = {
     notes,
     folders,
@@ -568,7 +778,14 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
     toggleSelectedNotesSync,
     getSyncedNotes,
     syncNote,
-    unsyncNote
+    unsyncNote,
+    addPageToNote,
+    deletePageFromNote,
+    setCurrentPageIndex,
+    addTagToNote,
+    removeTagFromNote,
+    getAllTags,
+    getNotesWithTag
   };
 
   return (

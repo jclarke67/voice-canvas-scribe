@@ -3,7 +3,7 @@ import React from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { Note } from '@/types';
 import { useNotes } from '@/context/NoteContext';
-import { Headphones, Cloud, CloudOff, Trash2, FileDown } from 'lucide-react';
+import { Headphones, Cloud, CloudOff, Trash2, FileDown, Tag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 
@@ -97,6 +97,22 @@ const NoteCard: React.FC<NoteCardProps> = ({
             {note.content || "No content"}
           </p>
           
+          {note.tags && note.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {note.tags.slice(0, 3).map(tag => (
+                <div key={tag} className="flex items-center px-1.5 py-0.5 bg-accent/70 rounded-full text-xs">
+                  <Tag size={10} className="mr-1 text-primary" />
+                  <span className="truncate max-w-[80px]">{tag}</span>
+                </div>
+              ))}
+              {note.tags.length > 3 && (
+                <div className="px-1.5 py-0.5 bg-accent/70 rounded-full text-xs">
+                  +{note.tags.length - 3}
+                </div>
+              )}
+            </div>
+          )}
+          
           <div className="flex items-center mt-2 text-xs text-muted-foreground">
             <span className="truncate">
               {formatDistanceToNow(note.updatedAt, { addSuffix: true })}
@@ -106,6 +122,12 @@ const NoteCard: React.FC<NoteCardProps> = ({
               <div className="flex items-center ml-2">
                 <Headphones size={14} className="mr-1" />
                 <span>{note.recordings.length}</span>
+              </div>
+            )}
+            
+            {note.pages && note.pages.length > 1 && (
+              <div className="flex items-center ml-2">
+                <span>{note.pages.length} pages</span>
               </div>
             )}
           </div>

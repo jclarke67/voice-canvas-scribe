@@ -1,118 +1,111 @@
-import { Note, Recording, Folder } from '@/types';
 
-// Get all notes from localStorage
-export const getNotes = (): Note[] => {
-  const notesJson = localStorage.getItem('voice-canvas-notes');
-  if (!notesJson) return [];
-  
-  try {
-    return JSON.parse(notesJson);
-  } catch (error) {
-    console.error('Failed to parse notes from localStorage', error);
-    return [];
-  }
-};
+import { Note, Folder } from '@/types';
 
-// Save notes to localStorage
-export const saveNotes = (notes: Note[]): void => {
-  try {
-    localStorage.setItem('voice-canvas-notes', JSON.stringify(notes));
-    // Validate that the notes were saved correctly
-    const savedJson = localStorage.getItem('voice-canvas-notes');
-    if (!savedJson) {
-      console.error('Failed to save notes to localStorage: No data found after save');
-    } else {
-      // Try parsing to ensure data integrity
-      JSON.parse(savedJson);
-    }
-  } catch (error) {
-    console.error('Failed to save notes to localStorage', error);
-  }
-};
-
-// Get all folders from localStorage
-export const getFolders = (): Folder[] => {
-  const foldersJson = localStorage.getItem('voice-canvas-folders');
-  if (!foldersJson) return [];
-  
-  try {
-    return JSON.parse(foldersJson);
-  } catch (error) {
-    console.error('Failed to parse folders from localStorage', error);
-    return [];
-  }
-};
-
-// Save folders to localStorage
-export const saveFolders = (folders: Folder[]): void => {
-  localStorage.setItem('voice-canvas-folders', JSON.stringify(folders));
-};
+// Keys for local storage
+const NOTES_STORAGE_KEY = 'voice-canvas-notes';
+const FOLDERS_STORAGE_KEY = 'voice-canvas-folders';
 
 // Generate a unique ID
-export const generateId = (): string => {
-  return Date.now().toString(36) + Math.random().toString(36).substring(2);
+export const generateId = () => {
+  return Math.random().toString(36).substring(2, 11);
 };
 
-// Create a new empty note
+// Save notes to local storage
+export const saveNotes = (notes: Note[]) => {
+  localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(notes));
+};
+
+// Get notes from local storage
+export const getNotes = (): Note[] => {
+  const notesString = localStorage.getItem(NOTES_STORAGE_KEY);
+  if (!notesString) return [];
+
+  try {
+    const notes = JSON.parse(notesString);
+    
+    // Migrate notes to new format if needed
+    return notes.map((note: any) => {
+      // Add pages array if it doesn't exist
+      if (!note.pages || !Array.isArray(note.pages) || note.pages.length === 0) {
+        return {
+          ...note,
+          pages: [{
+            id: generateId(),
+            content: note.content || '',
+            recordings: [...(note.recordings || [])]
+          }],
+          currentPageIndex: 0,
+          tags: note.tags || []
+        };
+      }
+      
+      // Add tags array if it doesn't exist
+      if (!note.tags) {
+        return {
+          ...note,
+          tags: []
+        };
+      }
+      
+      return note;
+    });
+  } catch (error) {
+    console.error('Failed to parse notes from localStorage:', error);
+    return [];
+  }
+};
+
+// Save folders to local storage
+export const saveFolders = (folders: Folder[]) => {
+  localStorage.setItem(FOLDERS_STORAGE_KEY, JSON.stringify(folders));
+};
+
+// Get folders from local storage
+export const getFolders = (): Folder[] => {
+  const foldersString = localStorage.getItem(FOLDERS_STORAGE_KEY);
+  if (!foldersString) return [];
+
+  try {
+    return JSON.parse(foldersString);
+  } catch (error) {
+    console.error('Failed to parse folders from localStorage:', error);
+    return [];
+  }
+};
+
+// Create an empty note
 export const createEmptyNote = (folderId?: string): Note => {
   const now = Date.now();
   return {
     id: generateId(),
-    title: 'Untitled Note',
+    title: '',
     content: '',
     createdAt: now,
     updatedAt: now,
     recordings: [],
-    synced: false, // Add synced flag (defaults to false/local only)
-    ...(folderId ? { folderId } : {})
+    pages: [{
+      id: generateId(),
+      content: '',
+      recordings: []
+    }],
+    currentPageIndex: 0,
+    tags: [],
+    folderId,
+    synced: false
   };
 };
 
-// Save audio blob to localStorage (base64 encoded)
-export const saveAudioToStorage = async (blob: Blob): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      try {
-        const base64data = reader.result as string;
-        const audioId = generateId();
-        localStorage.setItem(`audio-${audioId}`, base64data);
-        resolve(audioId);
-      } catch (error) {
-        console.error('Error saving audio to storage:', error);
-        reject(error);
-      }
-    };
-    reader.onerror = (error) => {
-      console.error('Error reading audio blob:', error);
-      reject(error);
-    };
-    reader.readAsDataURL(blob);
-  });
+// Save audio to local storage
+export const saveAudioToStorage = (key: string, audioData: string) => {
+  localStorage.setItem(key, audioData);
 };
 
-// Get audio blob from localStorage
-export const getAudioFromStorage = (audioId: string): string | null => {
-  const data = localStorage.getItem(audioId);
-  if (!data) {
-    console.warn(`Audio data not found for ID: ${audioId}`);
-  }
-  return data;
+// Get audio from local storage
+export const getAudioFromStorage = (key: string) => {
+  return localStorage.getItem(key);
 };
 
-// Remove audio blob from localStorage
-export const removeAudioFromStorage = (audioId: string): void => {
-  localStorage.removeItem(audioId);
-};
-
-// List all audio keys in localStorage (for debugging)
-export const listAudioKeys = (): string[] => {
-  const keys: string[] = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key && key.startsWith('audio-')) {
-      keys.push(key);
-    }
-  }
-  return keys;
+// Remove audio from local storage
+export const removeAudioFromStorage = (key: string) => {
+  localStorage.removeItem(key);
 };

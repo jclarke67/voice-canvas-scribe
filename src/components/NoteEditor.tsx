@@ -1,16 +1,16 @@
-
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useNotes } from '@/context/NoteContext';
 import RecordingButton from './RecordingButton';
 import AudioPlayer from './AudioPlayer';
 import { formatDistanceToNow } from 'date-fns';
-import { Save, Trash2, Headphones, FolderOpen, Download, FileDown } from 'lucide-react';
+import { Save, Trash2, Headphones, FolderOpen, FileDown } from 'lucide-react';
 import RecordingsManager from './RecordingsManager';
 import VoiceRecordingsDropdown from './VoiceRecordingsDropdown';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { exportNoteAsText, exportNotesAsPDF } from '@/lib/exportUtils';
+import { toast } from 'sonner';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -18,13 +18,26 @@ import {
   DropdownMenuItem, 
   DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu';
-import { Textarea } from './ui/textarea';
+import QuillEditor from './QuillEditor';
+import PageNavigation from './PageNavigation';
+import TagInput from './TagInput';
 
 const NoteEditor: React.FC = () => {
-  const { currentNote, updateNote, deleteNote, folders } = useNotes();
+  const { 
+    currentNote, 
+    updateNote, 
+    deleteNote, 
+    folders, 
+    addPageToNote,
+    deletePageFromNote,
+    setCurrentPageIndex,
+    addTagToNote,
+    removeTagFromNote
+  } = useNotes();
+  
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<any>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showRecordingsManager, setShowRecordingsManager] = useState(false);
@@ -33,32 +46,60 @@ const NoteEditor: React.FC = () => {
   useEffect(() => {
     if (currentNote) {
       setTitle(currentNote.title);
-      setContent(currentNote.content);
+      const currentPage = currentNote.pages[currentNote.currentPageIndex || 0];
+      setContent(currentPage ? currentPage.content : '');
     } else {
       setTitle('');
       setContent('');
     }
   }, [currentNote]);
   
+  // When current page changes, update the content
+  useEffect(() => {
+    if (currentNote && currentNote.pages) {
+      const currentPage = currentNote.pages[currentNote.currentPageIndex || 0];
+      if (currentPage) {
+        setContent(currentPage.content);
+      }
+    }
+  }, [currentNote?.currentPageIndex]);
+  
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setTitle(e.target.value);
   };
   
-  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setContent(e.target.value);
+  const handleContentChange = (newContent: string) => {
+    setContent(newContent);
   };
   
   const getCursorPosition = useCallback(() => {
-    return textareaRef.current?.selectionStart || 0;
+    if (editorRef.current) {
+      return editorRef.current.cursorPosition || 0;
+    }
+    return 0;
   }, []);
   
   const saveNote = useCallback(() => {
     if (!currentNote) return;
     
     setIsSaving(true);
+    
+    // Update the content of the current page
+    const updatedPages = [...currentNote.pages];
+    const currentPageIndex = currentNote.currentPageIndex || 0;
+    
+    if (updatedPages[currentPageIndex]) {
+      updatedPages[currentPageIndex] = {
+        ...updatedPages[currentPageIndex],
+        content
+      };
+    }
+    
     updateNote({
       ...currentNote,
       title,
+      pages: updatedPages,
+      // Keep the content field in sync with current page for backward compatibility
       content
     });
     
@@ -111,6 +152,39 @@ const NoteEditor: React.FC = () => {
     exportNotesAsPDF([currentNote], currentNote.title || 'Note Export');
   };
   
+  const handleAddPage = () => {
+    if (!currentNote) return;
+    addPageToNote(currentNote.id);
+  };
+  
+  const handleDeletePage = () => {
+    if (!currentNote) return;
+    
+    if (currentNote.pages.length <= 1) {
+      toast.error('Cannot delete the only page');
+      return;
+    }
+    
+    if (window.confirm('Are you sure you want to delete this page?')) {
+      deletePageFromNote(currentNote.id, currentNote.currentPageIndex || 0);
+    }
+  };
+  
+  const handlePageChange = (pageIndex: number) => {
+    if (!currentNote) return;
+    setCurrentPageIndex(currentNote.id, pageIndex);
+  };
+  
+  const handleAddTag = (tag: string) => {
+    if (!currentNote) return;
+    addTagToNote(currentNote.id, tag);
+  };
+  
+  const handleRemoveTag = (tag: string) => {
+    if (!currentNote) return;
+    removeTagFromNote(currentNote.id, tag);
+  };
+  
   if (!currentNote) {
     return (
       <div className="flex flex-1 items-center justify-center text-muted-foreground p-6">
@@ -118,6 +192,10 @@ const NoteEditor: React.FC = () => {
       </div>
     );
   }
+  
+  // Get recordings for current page
+  const currentPage = currentNote.pages[currentNote.currentPageIndex || 0];
+  const currentPageRecordings = currentPage ? currentPage.recordings : [];
   
   return (
     <div className="flex flex-col h-[100vh] overflow-hidden">
@@ -192,20 +270,38 @@ const NoteEditor: React.FC = () => {
         </div>
       </div>
       
-      <div className="flex-1 overflow-auto p-4 flex flex-col">
-        <Textarea
-          ref={textareaRef}
-          value={content}
-          onChange={handleContentChange}
-          placeholder="Type your note here..."
-          className="w-full h-[80vh] resize-none bg-transparent border-none outline-none focus:ring-0 text-foreground"
+      {/* Tags input */}
+      <div className="px-4 pt-2">
+        <TagInput 
+          tags={currentNote.tags || []}
+          onAddTag={handleAddTag}
+          onRemoveTag={handleRemoveTag}
         />
+      </div>
+      
+      {/* Page navigation */}
+      <PageNavigation 
+        currentPage={currentNote.currentPageIndex || 0}
+        totalPages={currentNote.pages.length}
+        onPageChange={handlePageChange}
+        onAddPage={handleAddPage}
+        onDeletePage={handleDeletePage}
+      />
+      
+      <div className="flex-1 overflow-auto flex flex-col">
+        <div className="flex-1 px-4 py-2 h-full">
+          <QuillEditor 
+            content={content}
+            onChange={handleContentChange}
+            getCursorPosition={getCursorPosition}
+          />
+        </div>
         
-        {currentNote.recordings.length > 0 && (
-          <div className="mt-2 border-t pt-2">
-            <h3 className="font-medium text-sm mb-1">Voice notes</h3>
+        {currentPageRecordings.length > 0 && (
+          <div className="mt-2 border-t pt-2 px-4">
+            <h3 className="font-medium text-sm mb-1">Voice notes on this page</h3>
             <div className="space-y-2 max-h-[20vh] overflow-y-auto">
-              {currentNote.recordings.map(recording => (
+              {currentPageRecordings.map(recording => (
                 <AudioPlayer 
                   key={recording.id} 
                   audioId={recording.audioUrl} 
@@ -221,7 +317,7 @@ const NoteEditor: React.FC = () => {
       <div className="border-t p-2 flex justify-between items-center">
         <RecordingButton getCursorPosition={getCursorPosition} />
         <div className="text-xs text-muted-foreground">
-          {currentNote.recordings.length} voice note{currentNote.recordings.length !== 1 ? 's' : ''}
+          {currentPageRecordings.length} voice note{currentPageRecordings.length !== 1 ? 's' : ''} on this page
         </div>
       </div>
       
