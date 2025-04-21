@@ -1,0 +1,59 @@
+
+/* Custom styles for Quill editor */
+
+/* Image resize styles */
+.ql-editor img {
+  max-width: 100%;
+  transition: box-shadow 0.2s ease;
+}
+
+.ql-editor img.quill-image-resizable {
+  box-shadow: 0 0 0 2px #1a73e8;
+  cursor: nwse-resize;
+  resize: both;
+  overflow: hidden;
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 10px 0;
+}
+
+/* Font size helpers */
+.ql-snow .ql-picker.ql-size .ql-picker-label::before,
+.ql-snow .ql-picker.ql-size .ql-picker-item::before {
+  content: attr(data-value) !important;
+}
+
+.ql-editor .ql-size-small {
+  font-size: 0.75em;
+}
+
+.ql-editor .ql-size-large {
+  font-size: 1.5em;
+}
+
+.ql-editor .ql-size-huge {
+  font-size: 2em;
+}
+
+/* Make sure editor takes full height */
+.quill {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.ql-container {
+  flex: 1;
+  overflow: auto;
+}
+
+/* Custom highlight colors */
+.ql-snow .ql-picker.ql-background .ql-picker-options {
+  padding: 3px 5px;
+}
+
+/* Improve dropdown menus for font size */
+.ql-snow .ql-picker.ql-size {
+  width: 100px;
+}

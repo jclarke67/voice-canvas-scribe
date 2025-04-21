@@ -73,4 +73,6 @@ export type NoteContextType = {
   removeTagFromNote: (noteId: string, tag: string) => void;
   getAllTags: () => string[];
   getNotesWithTag: (tag: string) => Note[];
+  // Add new function for reordering pages
+  reorderNotePages: (noteId: string, fromIndex: number, toIndex: number) => void;
 };

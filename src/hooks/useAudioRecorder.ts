@@ -1,4 +1,3 @@
-
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { saveAudioToStorage } from '@/lib/storage';
 
@@ -170,7 +169,7 @@ export const useAudioRecorder = () => {
           const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
           
           // Convert blob to base64 and save it
-          const audioId = await saveAudioToStorage(audioBlob);
+          const audioId = await saveAudioToStorage(audioBlob, `recording-${Date.now()}`);
           
           // Stop all tracks in the stream
           mediaRecorderRef.current?.stream.getTracks().forEach(track => track.stop());

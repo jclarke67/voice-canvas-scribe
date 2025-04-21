@@ -32,7 +32,8 @@ const NoteEditor: React.FC = () => {
     deletePageFromNote,
     setCurrentPageIndex,
     addTagToNote,
-    removeTagFromNote
+    removeTagFromNote,
+    reorderNotePages
   } = useNotes();
   
   const [title, setTitle] = useState('');
@@ -54,7 +55,6 @@ const NoteEditor: React.FC = () => {
     }
   }, [currentNote]);
   
-  // When current page changes, update the content
   useEffect(() => {
     if (currentNote && currentNote.pages) {
       const currentPage = currentNote.pages[currentNote.currentPageIndex || 0];
@@ -84,7 +84,6 @@ const NoteEditor: React.FC = () => {
     
     setIsSaving(true);
     
-    // Update the content of the current page
     const updatedPages = [...currentNote.pages];
     const currentPageIndex = currentNote.currentPageIndex || 0;
     
@@ -99,7 +98,6 @@ const NoteEditor: React.FC = () => {
       ...currentNote,
       title,
       pages: updatedPages,
-      // Keep the content field in sync with current page for backward compatibility
       content
     });
     
@@ -185,6 +183,12 @@ const NoteEditor: React.FC = () => {
     removeTagFromNote(currentNote.id, tag);
   };
   
+  const handleReorderPages = (fromIndex: number, toIndex: number) => {
+    if (!currentNote) return;
+    
+    reorderNotePages(currentNote.id, fromIndex, toIndex);
+  };
+  
   if (!currentNote) {
     return (
       <div className="flex flex-1 items-center justify-center text-muted-foreground p-6">
@@ -193,7 +197,6 @@ const NoteEditor: React.FC = () => {
     );
   }
   
-  // Get recordings for current page
   const currentPage = currentNote.pages[currentNote.currentPageIndex || 0];
   const currentPageRecordings = currentPage ? currentPage.recordings : [];
   
@@ -270,7 +273,6 @@ const NoteEditor: React.FC = () => {
         </div>
       </div>
       
-      {/* Tags input */}
       <div className="px-4 pt-2">
         <TagInput 
           tags={currentNote.tags || []}
@@ -279,13 +281,13 @@ const NoteEditor: React.FC = () => {
         />
       </div>
       
-      {/* Page navigation */}
       <PageNavigation 
         currentPage={currentNote.currentPageIndex || 0}
         totalPages={currentNote.pages.length}
         onPageChange={handlePageChange}
         onAddPage={handleAddPage}
         onDeletePage={handleDeletePage}
+        onReorderPages={handleReorderPages}
       />
       
       <div className="flex-1 overflow-auto flex flex-col">
