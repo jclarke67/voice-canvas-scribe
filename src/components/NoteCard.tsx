@@ -3,7 +3,7 @@ import React from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { Note } from '@/types';
 import { useNotes } from '@/context/NoteContext';
-import { Headphones, Cloud, CloudOff } from 'lucide-react';
+import { Headphones, Cloud, CloudOff, Trash2, FileDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 
@@ -24,7 +24,9 @@ const NoteCard: React.FC<NoteCardProps> = ({
     currentNote, 
     setCurrentNote, 
     toggleNoteSelection, 
-    toggleNoteSync 
+    toggleNoteSync,
+    deleteNote,
+    exportRecording
   } = useNotes();
   
   const isActive = currentNote?.id === note.id;
@@ -46,6 +48,21 @@ const NoteCard: React.FC<NoteCardProps> = ({
   const handleSyncToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
     toggleNoteSync(note.id);
+  };
+  
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (window.confirm(`Are you sure you want to delete "${note.title || 'Untitled Note'}"?`)) {
+      deleteNote(note.id);
+    }
+  };
+  
+  const handleExport = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    // For now, just export the first recording if available
+    if (note.recordings.length > 0) {
+      exportRecording(note.recordings[0]);
+    }
   };
   
   return (
@@ -94,20 +111,38 @@ const NoteCard: React.FC<NoteCardProps> = ({
           </div>
         </div>
         
-        <button 
-          className={cn(
-            "p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity",
-            note.synced && "opacity-100"
-          )}
-          onClick={handleSyncToggle}
-          title={note.synced ? "Remove from cloud sync" : "Sync to cloud"}
-        >
-          {note.synced ? (
-            <Cloud size={16} className="text-primary" />
-          ) : (
-            <CloudOff size={16} className="text-muted-foreground" />
-          )}
-        </button>
+        <div className="flex flex-col gap-1">
+          <button 
+            className={cn(
+              "p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity",
+              note.synced && "opacity-100"
+            )}
+            onClick={handleSyncToggle}
+            title={note.synced ? "Remove from cloud sync" : "Sync to cloud"}
+          >
+            {note.synced ? (
+              <Cloud size={16} className="text-primary" />
+            ) : (
+              <CloudOff size={16} className="text-muted-foreground" />
+            )}
+          </button>
+          
+          <button 
+            className="p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={handleExport}
+            title="Export recording"
+          >
+            <FileDown size={16} className="text-muted-foreground hover:text-primary" />
+          </button>
+          
+          <button 
+            className="p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={handleDelete}
+            title="Delete note"
+          >
+            <Trash2 size={16} className="text-muted-foreground hover:text-destructive" />
+          </button>
+        </div>
       </div>
     </div>
   );
