@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNotes } from '@/context/NoteContext';
 import NoteCard from './NoteCard';
@@ -14,17 +15,19 @@ import MultiSelectControls from './MultiSelectControls';
 interface SidebarProps {
   isOpen: boolean;
   toggleSidebar: () => void;
+  onNoteCtrlClick?: (e: React.MouseEvent, noteId: string) => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
-  toggleSidebar
+  toggleSidebar,
+  onNoteCtrlClick
 }) => {
   const {
     notes,
     folders,
     currentNote,
-    setCurrentNote,
+    selectedNoteIds,
     createNote,
     deleteFolder,
     updateFolder
@@ -34,6 +37,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [showFolderManager, setShowFolderManager] = useState(false);
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
   const [editingFolderName, setEditingFolderName] = useState('');
+  const [multiSelectMode, setMultiSelectMode] = useState(false);
 
   const toggleFolder = (folderId: string) => {
     setExpandedFolders(prev => ({
@@ -67,7 +71,12 @@ const Sidebar: React.FC<SidebarProps> = ({
     exportNotesAsPDF(notes, 'All Notes');
   };
 
-  const filteredNotes = searchTerm ? notes.filter(note => note.title.toLowerCase().includes(searchTerm.toLowerCase()) || note.content.toLowerCase().includes(searchTerm.toLowerCase())) : notes;
+  const filteredNotes = searchTerm 
+    ? notes.filter(note => 
+        note.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        note.content.toLowerCase().includes(searchTerm.toLowerCase()))
+    : notes;
+  
   const sortedNotes = [...filteredNotes].sort((a, b) => b.updatedAt - a.updatedAt);
   const unfilteredNotes = sortedNotes.filter(note => !note.folderId);
   const folderNotes: Record<string, typeof sortedNotes> = {};
@@ -91,7 +100,12 @@ const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
-  return <div className="h-full flex flex-col bg-background border-r">
+  const toggleMultiSelectMode = () => {
+    setMultiSelectMode(prev => !prev);
+  };
+
+  return (
+    <div className="h-full flex flex-col bg-background border-r">
       <div className="flex items-center justify-between p-4 border-b">
         <h1 className="font-semibold text-lg">Voice Canvas</h1>
         <div className="flex items-center space-x-1">
@@ -103,14 +117,42 @@ const Sidebar: React.FC<SidebarProps> = ({
       </div>
       
       <div className="flex-1 overflow-y-auto p-4">
-        <MultiSelectControls />
+        {selectedNoteIds.length > 0 && <MultiSelectControls />}
         
-        {searchTerm && sortedNotes.length === 0 && <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-4 text-center">
+        <div className="mb-4 flex items-center justify-between">
+          <div className="relative flex-1 mr-2">
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search notes..."
+              className="w-full h-9 px-3 py-2 text-sm bg-background border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            <Search className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+          </div>
+          
+          <button
+            onClick={toggleMultiSelectMode}
+            className={cn(
+              "px-2 py-1 text-xs rounded-md transition-colors",
+              multiSelectMode 
+                ? "bg-primary text-primary-foreground" 
+                : "bg-accent text-accent-foreground"
+            )}
+          >
+            {multiSelectMode ? "Cancel Select" : "Select"}
+          </button>
+        </div>
+        
+        {searchTerm && sortedNotes.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-4 text-center">
             <p className="mb-2">No notes found</p>
             <p className="text-sm">Try a different search term</p>
-          </div>}
+          </div>
+        )}
         
-        {!searchTerm && <div className="mb-2 flex justify-between items-center">
+        {!searchTerm && (
+          <div className="mb-2 flex justify-between items-center">
             <div className="text-sm font-medium text-muted-foreground px-2 py-1">Folders</div>
             <div className="flex space-x-1">
               <button onClick={handleExportAllNotes} className="p-1 rounded-md hover:bg-accent text-muted-foreground" title="Export all notes">
@@ -120,46 +162,96 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <FolderPlus size={16} />
               </button>
             </div>
-          </div>}
+          </div>
+        )}
         
-        {!searchTerm && folders.map(folder => <Collapsible key={folder.id} open={expandedFolders[folder.id]} onOpenChange={() => toggleFolder(folder.id)} className="mb-1">
+        {!searchTerm && folders.map(folder => (
+          <Collapsible 
+            key={folder.id} 
+            open={expandedFolders[folder.id]} 
+            onOpenChange={() => toggleFolder(folder.id)} 
+            className="mb-1"
+          >
             <CollapsibleTrigger className="w-full flex items-center justify-between p-2 hover:bg-accent/50 rounded-md">
               <div className="flex items-center text-sm flex-1">
                 <Folder size={16} className="mr-2 text-primary" />
-                {editingFolderId === folder.id ? <form onSubmit={handleSaveFolder} className="flex-1">
-                    <input type="text" value={editingFolderName} onChange={e => setEditingFolderName(e.target.value)} onBlur={handleSaveFolder} className="w-full bg-background px-2 py-1 rounded-md text-sm" autoFocus />
-                  </form> : <>
-                    <span onDoubleClick={e => handleStartEditingFolder(folder.id, folder.name, e)} className="flex-1">
+                {editingFolderId === folder.id ? (
+                  <form onSubmit={handleSaveFolder} className="flex-1">
+                    <input 
+                      type="text" 
+                      value={editingFolderName} 
+                      onChange={e => setEditingFolderName(e.target.value)} 
+                      onBlur={handleSaveFolder} 
+                      className="w-full bg-background px-2 py-1 rounded-md text-sm" 
+                      autoFocus 
+                    />
+                  </form>
+                ) : (
+                  <>
+                    <span 
+                      onDoubleClick={e => handleStartEditingFolder(folder.id, folder.name, e)} 
+                      className="flex-1"
+                    >
                       {folder.name}
                     </span>
                     <span className="ml-2 text-xs text-muted-foreground">
                       ({folderNotes[folder.id]?.length || 0})
                     </span>
-                  </>}
+                  </>
+                )}
               </div>
               
               <div className="flex items-center space-x-1">
-                <button onClick={e => handleExportFolder(folder.id, e)} className="p-1 rounded-md hover:bg-accent text-muted-foreground" title="Export folder">
+                <button 
+                  onClick={e => handleExportFolder(folder.id, e)} 
+                  className="p-1 rounded-md hover:bg-accent text-muted-foreground" 
+                  title="Export folder"
+                >
                   <FileDown size={14} />
                 </button>
-                <button onClick={e => handleDeleteFolder(folder.id, e)} className="p-1 rounded-md hover:bg-accent text-muted-foreground hover:text-destructive" title="Delete folder">
+                <button 
+                  onClick={e => handleDeleteFolder(folder.id, e)} 
+                  className="p-1 rounded-md hover:bg-accent text-muted-foreground hover:text-destructive" 
+                  title="Delete folder"
+                >
                   <Trash2 size={14} />
                 </button>
-                {expandedFolders[folder.id] ? <ChevronDown size={16} className="text-muted-foreground" /> : <ChevronRight size={16} className="text-muted-foreground" />}
+                {expandedFolders[folder.id] ? (
+                  <ChevronDown size={16} className="text-muted-foreground" />
+                ) : (
+                  <ChevronRight size={16} className="text-muted-foreground" />
+                )}
               </div>
             </CollapsibleTrigger>
             <CollapsibleContent className="ml-4 mt-1 space-y-1">
-              {folderNotes[folder.id]?.length > 0 ? folderNotes[folder.id].map(note => <NoteCard key={note.id} note={note} isActive={currentNote?.id === note.id} />) : <div className="text-xs text-muted-foreground p-2">
+              {folderNotes[folder.id]?.length > 0 ? (
+                folderNotes[folder.id].map(note => (
+                  <NoteCard 
+                    key={note.id} 
+                    note={note} 
+                    isSelected={selectedNoteIds.includes(note.id)}
+                    multiSelectMode={multiSelectMode}
+                    onCtrlClick={onNoteCtrlClick}
+                  />
+                ))
+              ) : (
+                <div className="text-xs text-muted-foreground p-2">
                   No notes in this folder
-                </div>}
-              <button onClick={() => createNote(folder.id)} className="w-full text-left text-xs p-2 text-muted-foreground hover:bg-accent/50 rounded-md flex items-center">
+                </div>
+              )}
+              <button 
+                onClick={() => createNote(folder.id)} 
+                className="w-full text-left text-xs p-2 text-muted-foreground hover:bg-accent/50 rounded-md flex items-center"
+              >
                 <Plus size={14} className="mr-1" />
                 New note in this folder
               </button>
             </CollapsibleContent>
-          </Collapsible>)}
+          </Collapsible>
+        ))}
         
-        {!searchTerm && <div className="mb-2 mt-4 flex justify-between items-center">
+        {!searchTerm && (
+          <div className="mb-2 mt-4 flex justify-between items-center">
             <div className="text-sm font-medium text-muted-foreground px-2 py-1">
               Unfiled Notes
             </div>
@@ -175,17 +267,43 @@ const Sidebar: React.FC<SidebarProps> = ({
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>}
+          </div>
+        )}
         
-        {searchTerm ? sortedNotes.map(note => <NoteCard key={note.id} note={note} isActive={currentNote?.id === note.id} />) : unfilteredNotes.map(note => <NoteCard key={note.id} note={note} isActive={currentNote?.id === note.id} />)}
+        {searchTerm ? 
+          sortedNotes.map(note => (
+            <NoteCard 
+              key={note.id} 
+              note={note} 
+              isSelected={selectedNoteIds.includes(note.id)}
+              multiSelectMode={multiSelectMode}
+              onCtrlClick={onNoteCtrlClick}
+            />
+          )) 
+          : 
+          unfilteredNotes.map(note => (
+            <NoteCard 
+              key={note.id} 
+              note={note} 
+              isSelected={selectedNoteIds.includes(note.id)}
+              multiSelectMode={multiSelectMode}
+              onCtrlClick={onNoteCtrlClick}
+            />
+          ))
+        }
         
-        {!searchTerm && unfilteredNotes.length === 0 && <div className="text-xs text-muted-foreground p-2">
+        {!searchTerm && unfilteredNotes.length === 0 && (
+          <div className="text-xs text-muted-foreground p-2">
             No unfiled notes
-          </div>}
+          </div>
+        )}
       </div>
       
       <div className="p-3 border-t">
-        <button onClick={() => createNote()} className="w-full py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors flex items-center justify-center">
+        <button 
+          onClick={() => createNote()} 
+          className="w-full py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors flex items-center justify-center"
+        >
           <Plus size={16} className="mr-1" />
           New Note
         </button>
@@ -197,7 +315,8 @@ const Sidebar: React.FC<SidebarProps> = ({
           onClose={() => setShowFolderManager(false)} 
         />
       )}
-    </div>;
+    </div>
+  );
 };
 
 export default Sidebar;

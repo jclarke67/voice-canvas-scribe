@@ -5,7 +5,7 @@ import Sidebar from '@/components/Sidebar';
 import NoteEditor from '@/components/NoteEditor';
 import EmptyState from '@/components/EmptyState';
 import KeyboardShortcutsHelp from '@/components/KeyboardShortcutsHelp';
-import { Menu, Plus, HelpCircle, Cloud } from 'lucide-react';
+import { Menu, Plus, HelpCircle } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useTheme } from '@/App';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';

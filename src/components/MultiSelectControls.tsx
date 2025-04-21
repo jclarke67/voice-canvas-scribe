@@ -1,8 +1,8 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useNotes } from '@/context/NoteContext';
 import { Button } from '@/components/ui/button';
-import { Folder, Trash2, CloudUpload, CloudOff } from 'lucide-react';
+import { Folder, Trash2, Cloud, CloudOff } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,8 +10,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Checkbox } from '@/components/ui/checkbox';
-import { useState } from 'react';
 
 const MultiSelectControls: React.FC = () => {
   const { 
@@ -86,7 +84,7 @@ const MultiSelectControls: React.FC = () => {
           onClick={handleSyncSelected}
           title="Sync selected notes to cloud"
         >
-          <CloudUpload size={16} />
+          <Cloud size={16} />
         </Button>
         
         <Button 
