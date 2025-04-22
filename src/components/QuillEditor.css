@@ -24,16 +24,57 @@
   content: attr(data-value) !important;
 }
 
-.ql-editor .ql-size-small {
-  font-size: 0.75em;
+/* Font size class definitions */
+.ql-editor .ql-size-8pt {
+  font-size: 8pt;
 }
 
-.ql-editor .ql-size-large {
-  font-size: 1.5em;
+.ql-editor .ql-size-9pt {
+  font-size: 9pt;
 }
 
-.ql-editor .ql-size-huge {
-  font-size: 2em;
+.ql-editor .ql-size-10pt {
+  font-size: 10pt;
+}
+
+.ql-editor .ql-size-12pt {
+  font-size: 12pt;
+}
+
+.ql-editor .ql-size-14pt {
+  font-size: 14pt;
+}
+
+.ql-editor .ql-size-16pt {
+  font-size: 16pt;
+}
+
+.ql-editor .ql-size-18pt {
+  font-size: 18pt;
+}
+
+.ql-editor .ql-size-24pt {
+  font-size: 24pt;
+}
+
+.ql-editor .ql-size-30pt {
+  font-size: 30pt;
+}
+
+.ql-editor .ql-size-36pt {
+  font-size: 36pt;
+}
+
+.ql-editor .ql-size-48pt {
+  font-size: 48pt;
+}
+
+.ql-editor .ql-size-60pt {
+  font-size: 60pt;
+}
+
+.ql-editor .ql-size-72pt {
+  font-size: 72pt;
 }
 
 /* Make sure editor takes full height */

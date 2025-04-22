@@ -2,7 +2,7 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
-import './QuillEditor.css'; // We'll create this file for custom styles
+import './QuillEditor.css'; // Custom styles for the editor
 
 interface QuillEditorProps {
   content: string;
@@ -76,13 +76,30 @@ const QuillEditor: React.FC<QuillEditorProps> = ({
     }
   }, [quillRef]);
   
+  // Define custom font sizes (in px)
+  const fontSizeAttributor = {
+    "8pt": "8pt",
+    "9pt": "9pt",
+    "10pt": "10pt",
+    "12pt": "12pt",
+    "14pt": "14pt",
+    "16pt": "16pt",
+    "18pt": "18pt",
+    "24pt": "24pt",
+    "30pt": "30pt",
+    "36pt": "36pt",
+    "48pt": "48pt",
+    "60pt": "60pt",
+    "72pt": "72pt"
+  };
+  
   const modules = {
     toolbar: [
       [{ 'header': [1, 2, 3, false] }],
       [{ 'font': [] }],
-      [{ 'size': ['small', false, 'large', 'huge'] }], // Added font size options
+      [{ 'size': Object.keys(fontSizeAttributor) }], // Font size options
       ['bold', 'italic', 'underline', 'strike', 'blockquote'],
-      [{ 'color': [] }, { 'background': [] }], // Added text color and highlighting
+      [{ 'color': [] }, { 'background': [] }], // Text color and highlighting
       [{'list': 'ordered'}, {'list': 'bullet'}, {'indent': '-1'}, {'indent': '+1'}],
       ['link', 'image'],
       ['clean']

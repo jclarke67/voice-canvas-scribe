@@ -752,6 +752,35 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return notes.filter(note => note.tags && note.tags.includes(tag));
   };
 
+  const reorderNotePages = (noteId: string, fromIndex: number, toIndex: number) => {
+    setNotes(prevNotes => {
+      const updatedNotes = prevNotes.map(note => {
+        if (note.id === noteId) {
+          const updatedPages = [...note.pages];
+          const [movedPage] = updatedPages.splice(fromIndex, 1);
+          updatedPages.splice(toIndex, 0, movedPage);
+          
+          const updatedNote = {
+            ...note,
+            pages: updatedPages,
+            currentPageIndex: note.currentPageIndex === fromIndex ? toIndex : note.currentPageIndex,
+            updatedAt: Date.now()
+          };
+          
+          if (currentNote && currentNote.id === noteId) {
+            setCurrentNote(updatedNote);
+          }
+          
+          return updatedNote;
+        }
+        return note;
+      });
+      
+      return updatedNotes;
+    });
+    toast.success('Pages reordered');
+  };
+
   const contextValue: NoteContextType = {
     notes,
     folders,
@@ -785,7 +814,8 @@ export const NoteProvider: React.FC<{ children: React.ReactNode }> = ({ children
     addTagToNote,
     removeTagFromNote,
     getAllTags,
-    getNotesWithTag
+    getNotesWithTag,
+    reorderNotePages
   };
 
   return (

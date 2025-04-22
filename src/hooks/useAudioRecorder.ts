@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { saveAudioToStorage } from '@/lib/storage';
+import { generateId } from '@/lib/storage';
 
 interface RecordingResult {
   audioUrl: string;
@@ -169,24 +169,35 @@ export const useAudioRecorder = () => {
           const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
           
           // Convert blob to base64 and save it
-          const audioId = await saveAudioToStorage(audioBlob, `recording-${Date.now()}`);
-          
-          // Stop all tracks in the stream
-          mediaRecorderRef.current?.stream.getTracks().forEach(track => track.stop());
-          
-          // Clear the recording timer
-          if (timerRef.current) {
-            clearInterval(timerRef.current);
-            timerRef.current = null;
-          }
-          
-          setIsRecording(false);
-          setRecordingTime(0);
+          const reader = new FileReader();
+          reader.readAsDataURL(audioBlob);
+          reader.onloadend = () => {
+            const base64data = reader.result as string;
+            const audioId = generateId();
+            localStorage.setItem(`audio-${audioId}`, base64data);
+            
+            // Stop all tracks in the stream
+            mediaRecorderRef.current?.stream.getTracks().forEach(track => track.stop());
+            
+            // Clear the recording timer
+            if (timerRef.current) {
+              clearInterval(timerRef.current);
+              timerRef.current = null;
+            }
+            
+            setIsRecording(false);
+            setRecordingTime(0);
 
-          // Clear recording state from session storage
-          sessionStorage.removeItem('voice-canvas-recording-state');
+            // Clear recording state from session storage
+            sessionStorage.removeItem('voice-canvas-recording-state');
+            
+            resolve({ audioUrl: audioId, duration });
+          };
           
-          resolve({ audioUrl: audioId, duration });
+          reader.onerror = (error) => {
+            console.error('Error converting audio to base64:', error);
+            resolve(null);
+          };
         } catch (error) {
           console.error('Error saving audio:', error);
           resolve(null);

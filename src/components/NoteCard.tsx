@@ -94,7 +94,9 @@ const NoteCard: React.FC<NoteCardProps> = ({
           </h3>
           
           <p className="text-sm text-muted-foreground line-clamp-2 mt-1 break-words">
-            {note.content || "No content"}
+            {note.pages && note.pages.length > 0 && note.pages[0].content ? 
+              note.pages[0].content.replace(/<[^>]*>/g, '') : 
+              "No content"}
           </p>
           
           {note.tags && note.tags.length > 0 && (
