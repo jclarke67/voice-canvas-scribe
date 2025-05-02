@@ -1,11 +1,6 @@
 
 /* Custom styles for Quill editor */
 
-/* Overall container */
-.quill-editor-container {
-  position: relative;
-}
-
 /* Image resize styles */
 .ql-editor img {
   max-width: 100%;
@@ -21,8 +16,6 @@
   height: auto;
   display: block;
   margin: 10px 0;
-  min-width: 50px;
-  min-height: 50px;
 }
 
 /* Font size helpers */
@@ -31,99 +24,57 @@
   content: attr(data-value) !important;
 }
 
-/* Line height styles */
-.ql-snow .ql-picker.ql-lineHeight {
-  width: 80px;
-}
-
-.ql-snow .ql-picker.ql-lineHeight .ql-picker-label::before {
-  content: 'Line' !important;
-}
-
-.ql-snow .ql-picker.ql-lineHeight .ql-picker-item::before {
-  content: attr(data-value) !important;
-}
-
-/* Font size class definitions - using !important to ensure they take effect */
+/* Font size class definitions */
 .ql-editor .ql-size-8pt {
-  font-size: 8pt !important;
+  font-size: 8pt;
 }
 
 .ql-editor .ql-size-9pt {
-  font-size: 9pt !important;
+  font-size: 9pt;
 }
 
 .ql-editor .ql-size-10pt {
-  font-size: 10pt !important;
+  font-size: 10pt;
 }
 
 .ql-editor .ql-size-12pt {
-  font-size: 12pt !important;
+  font-size: 12pt;
 }
 
 .ql-editor .ql-size-14pt {
-  font-size: 14pt !important;
+  font-size: 14pt;
 }
 
 .ql-editor .ql-size-16pt {
-  font-size: 16pt !important;
+  font-size: 16pt;
 }
 
 .ql-editor .ql-size-18pt {
-  font-size: 18pt !important;
+  font-size: 18pt;
 }
 
 .ql-editor .ql-size-24pt {
-  font-size: 24pt !important;
+  font-size: 24pt;
 }
 
 .ql-editor .ql-size-30pt {
-  font-size: 30pt !important;
+  font-size: 30pt;
 }
 
 .ql-editor .ql-size-36pt {
-  font-size: 36pt !important;
+  font-size: 36pt;
 }
 
 .ql-editor .ql-size-48pt {
-  font-size: 48pt !important;
+  font-size: 48pt;
 }
 
 .ql-editor .ql-size-60pt {
-  font-size: 60pt !important;
+  font-size: 60pt;
 }
 
 .ql-editor .ql-size-72pt {
-  font-size: 72pt !important;
-}
-
-/* Line height class definitions */
-.ql-editor .ql-line-height-1-0 {
-  line-height: 1.0 !important;
-}
-
-.ql-editor .ql-line-height-1-2 {
-  line-height: 1.2 !important;
-}
-
-.ql-editor .ql-line-height-1-5 {
-  line-height: 1.5 !important;
-}
-
-.ql-editor .ql-line-height-1-8 {
-  line-height: 1.8 !important;
-}
-
-.ql-editor .ql-line-height-2-0 {
-  line-height: 2.0 !important;
-}
-
-.ql-editor .ql-line-height-2-5 {
-  line-height: 2.5 !important;
-}
-
-.ql-editor .ql-line-height-3-0 {
-  line-height: 3.0 !important;
+  font-size: 72pt;
 }
 
 /* Make sure editor takes full height */
@@ -146,35 +97,4 @@
 /* Improve dropdown menus for font size */
 .ql-snow .ql-picker.ql-size {
   width: 100px;
-}
-
-/* Overflow menu button */
-.quill-overflow-button {
-  position: absolute;
-  top: 3px;
-  right: 10px;
-  z-index: 10;
-  background: #fff;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-}
-
-/* Overflow popover content */
-.quill-popover-content {
-  width: 250px;
-}
-
-.quill-overflow-toolbar {
-  padding: 8px;
-}
-
-/* Media queries for responsive toolbar */
-@media (max-width: 768px) {
-  .ql-toolbar.ql-snow {
-    padding-right: 40px; /* Make room for overflow button */
-  }
-  
-  .ql-toolbar.ql-snow .ql-formats {
-    margin-right: 4px;
-  }
 }
