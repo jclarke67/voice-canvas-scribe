@@ -1,6 +1,5 @@
-
 import React, { useCallback, useEffect, useState, useRef } from 'react';
-import ReactQuill from 'react-quill';
+import ReactQuill, { Quill } from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import './QuillEditor.css'; // Custom styles for the editor
 import { useMediaQuery } from '@/hooks/useMediaQuery';
