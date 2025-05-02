@@ -1,5 +1,6 @@
+
 import React, { useCallback, useEffect, useState, useRef } from 'react';
-import ReactQuill, { Quill } from 'react-quill';
+import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import './QuillEditor.css'; // Custom styles for the editor
 import { useMediaQuery } from '@/hooks/useMediaQuery';
@@ -72,26 +73,23 @@ const QuillEditor: React.FC<QuillEditorProps> = ({
       });
       
       // Register the custom size formats
-      const sizeStyle = Quill.import('attributors/style/size');
+      const sizeStyle = quill.constructor.import('attributors/style/size');
       sizeStyle.whitelist = [
         '8pt', '9pt', '10pt', '12pt', '14pt', '16pt', 
         '18pt', '24pt', '30pt', '36pt', '48pt', '60pt', '72pt'
       ];
-      Quill.register(sizeStyle, true);
+      quill.constructor.register(sizeStyle, true);
       
       // Register line height formats
-      const lineHeightStyle = Quill.import('attributors/style/lineHeight');
-      if (!lineHeightStyle) {
-        const Parchment = Quill.import('parchment');
-        const lineHeightConfig = {
-          scope: Parchment.Scope.INLINE,
-          whitelist: ['1.0', '1.2', '1.5', '1.8', '2.0', '2.5', '3.0']
-        };
-        const LineHeightStyle = new Parchment.Attributor.Style('lineHeight', 'line-height', lineHeightConfig);
-        Quill.register({
-          'formats/lineHeight': LineHeightStyle
-        });
-      }
+      const Parchment = quill.constructor.import('parchment');
+      const lineHeightConfig = {
+        scope: Parchment.Scope.INLINE,
+        whitelist: ['1.0', '1.2', '1.5', '1.8', '2.0', '2.5', '3.0']
+      };
+      const LineHeightStyle = new Parchment.Attributor.Style('lineHeight', 'line-height', lineHeightConfig);
+      quill.constructor.register({
+        'formats/lineHeight': LineHeightStyle
+      });
     }
   }, [quillRef]);
   
