@@ -9,11 +9,16 @@ import {
   PopoverContent, 
   PopoverTrigger 
 } from '@/components/ui/popover';
-import { Ellipsis, TextCursor } from 'lucide-react';
+import { Ellipsis } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-// Import Quill as a type to access static properties
-const Quill = ReactQuill.Quill;
+// Type for the Quill object with static properties
+interface QuillType {
+  Quill: {
+    import: (name: string) => any;
+    register: (format: any, isBlock?: boolean) => void;
+  };
+}
 
 interface QuillEditorProps {
   content: string;
@@ -75,23 +80,26 @@ const QuillEditor: React.FC<QuillEditorProps> = ({
         }
       });
       
-      if (Quill) {
+      // Access Quill from ReactQuill
+      const ReactQuillModule = ReactQuill as unknown as QuillType;
+      
+      if (ReactQuillModule.Quill) {
         // Register the custom size formats
-        const sizeStyle = Quill.import('attributors/style/size');
+        const sizeStyle = ReactQuillModule.Quill.import('attributors/style/size');
         sizeStyle.whitelist = [
           '8pt', '9pt', '10pt', '12pt', '14pt', '16pt', 
           '18pt', '24pt', '30pt', '36pt', '48pt', '60pt', '72pt'
         ];
-        Quill.register(sizeStyle, true);
+        ReactQuillModule.Quill.register(sizeStyle, true);
         
         // Register line height formats
-        const Parchment = Quill.import('parchment');
+        const Parchment = ReactQuillModule.Quill.import('parchment');
         const lineHeightConfig = {
           scope: Parchment.Scope.INLINE,
           whitelist: ['1.0', '1.2', '1.5', '1.8', '2.0', '2.5', '3.0']
         };
         const LineHeightStyle = new Parchment.Attributor.Style('lineHeight', 'line-height', lineHeightConfig);
-        Quill.register({
+        ReactQuillModule.Quill.register({
           'formats/lineHeight': LineHeightStyle
         });
       }
