@@ -19,6 +19,7 @@ const RecordingsManager: React.FC<RecordingsManagerProps> = ({ isOpen, onClose }
   const { currentNote, updateRecording, deleteRecording, importRecording, exportRecording } = useNotes();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   if (!currentNote) return null;
@@ -58,17 +59,27 @@ const RecordingsManager: React.FC<RecordingsManagerProps> = ({ isOpen, onClose }
     if (!files || files.length === 0 || !currentNote) return;
     
     const file = files[0];
-    // Check if it's an audio file
-    if (!file.type.startsWith('audio/')) {
-      toast.error('Please select an audio file');
-      return;
-    }
+    setIsImporting(true);
     
-    await importRecording(currentNote.id, file);
-    
-    // Reset the file input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+    try {
+      // Check if it's an audio file
+      if (!file.type.startsWith('audio/')) {
+        toast.error('Please select an audio file');
+        return;
+      }
+      
+      await importRecording(currentNote.id, file);
+      toast.success('Recording imported successfully');
+    } catch (error) {
+      console.error('Error importing recording:', error);
+      toast.error('Failed to import recording');
+    } finally {
+      setIsImporting(false);
+      
+      // Reset the file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
   
@@ -153,9 +164,22 @@ const RecordingsManager: React.FC<RecordingsManagerProps> = ({ isOpen, onClose }
             accept="audio/*"
             className="hidden"
           />
-          <Button onClick={triggerFileInput} variant="outline">
-            <Upload size={16} className="mr-2" />
-            Import Recording
+          <Button 
+            onClick={triggerFileInput} 
+            variant="outline"
+            disabled={isImporting}
+          >
+            {isImporting ? (
+              <>
+                <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+                Importing...
+              </>
+            ) : (
+              <>
+                <Upload size={16} className="mr-2" />
+                Import Recording
+              </>
+            )}
           </Button>
           <Button onClick={onClose}>Close</Button>
         </DialogFooter>

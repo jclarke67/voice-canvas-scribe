@@ -97,7 +97,17 @@ export const createEmptyNote = (folderId?: string): Note => {
 
 // Save audio to local storage
 export const saveAudioToStorage = (key: string, audioData: string) => {
-  localStorage.setItem(key, audioData);
+  try {
+    localStorage.setItem(key, audioData);
+    return true;
+  } catch (error) {
+    console.error('Error saving audio to storage:', error);
+    // If localStorage is full, try to clear some space
+    if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+      return false;
+    }
+    return false;
+  }
 };
 
 // Get audio from local storage
