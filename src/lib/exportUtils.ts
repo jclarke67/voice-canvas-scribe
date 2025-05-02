@@ -1,202 +1,98 @@
 
-import { Note, Recording, Folder } from '@/types';
-import { getAudioFromStorage } from './storage';
-import { jsPDF } from 'jspdf';
-import { toast } from 'sonner';
+import { jsPDF } from "jspdf";
+import { Note } from "@/types";
 
-// Format date for file names
-const formatDateForFilename = (date: number): string => {
-  const d = new Date(date);
-  return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}_${d.getHours().toString().padStart(2, '0')}-${d.getMinutes().toString().padStart(2, '0')}`;
-};
-
-// Helper function to extract text content from HTML
-const extractTextFromHTML = (html: string): string => {
-  if (!html) return '';
-  
-  // Create a temporary DOM element to parse the HTML content
+// Helper function to convert HTML to plain text
+const htmlToPlainText = (html: string): string => {
+  // Create a temporary element to parse HTML
   const tempDiv = document.createElement('div');
   tempDiv.innerHTML = html;
-  
-  // Extract text content
-  return tempDiv.textContent || tempDiv.innerText || '';
+  // Get the text content, which strips all HTML tags
+  return tempDiv.textContent || '';
 };
 
-// Export a single note as text file
 export const exportNoteAsText = (note: Note): void => {
-  try {
-    // Process all pages and join them with page markers
-    const allPagesContent = note.pages.map((page, index) => {
-      const textContent = extractTextFromHTML(page.content);
-      return `--- Page ${index + 1} ---\n\n${textContent}`;
-    }).join('\n\n');
-    
-    const blob = new Blob([`${note.title}\n\n${allPagesContent}`], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${note.title || 'Note'}_${formatDateForFilename(note.updatedAt)}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    toast.success('Note exported as text file');
-  } catch (error) {
-    console.error('Error exporting note:', error);
-    toast.error('Failed to export note');
-  }
+  if (!note) return;
+
+  // Convert all pages to plain text and join them
+  let noteContent = "";
+  note.pages.forEach((page, index) => {
+    noteContent += `---- Page ${index + 1} ----\n\n`;
+    noteContent += htmlToPlainText(page.content);
+    noteContent += "\n\n";
+  });
+
+  // Create a blob with the note content
+  const blob = new Blob([`${note.title}\n\n${noteContent}`], {
+    type: "text/plain;charset=utf-8",
+  });
+
+  // Create a download link and trigger it
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${note.title || "Note"}.txt`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 };
 
-// Export a recording
-export const exportRecording = (recording: Recording): void => {
-  try {
-    const audioData = getAudioFromStorage(`audio-${recording.audioUrl}`);
-    if (!audioData) {
-      toast.error('Recording data not found');
-      return;
+export const exportNotesAsPDF = (notes: Note[], filename: string): void => {
+  const pdf = new jsPDF();
+  let currentPage = 1;
+
+  notes.forEach((note, noteIndex) => {
+    // Add note title
+    if (noteIndex > 0) {
+      pdf.addPage();
+      currentPage++;
     }
-    
-    const a = document.createElement('a');
-    a.href = audioData;
-    a.download = `${recording.name || 'recording'}.webm`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    
-    toast.success('Recording exported');
-  } catch (error) {
-    console.error('Error exporting recording:', error);
-    toast.error('Failed to export recording');
-  }
-};
 
-// Export multiple notes as a single PDF
-export const exportNotesAsPDF = (notes: Note[], title: string = 'Notes Export'): void => {
-  try {
-    const doc = new jsPDF();
-    let yPos = 20;
+    pdf.setFontSize(16);
+    pdf.text(note.title || "Untitled Note", 20, 20);
     
-    // Add title
-    doc.setFontSize(16);
-    doc.text(title, 20, yPos);
-    yPos += 10;
+    pdf.setFontSize(11);
+    let yPosition = 30;
     
-    // Add date
-    doc.setFontSize(10);
-    doc.text(`Exported on ${new Date().toLocaleString()}`, 20, yPos);
-    yPos += 15;
-    
-    // Process each note
-    notes.forEach((note, noteIndex) => {
-      // Add page break if needed
-      if (yPos > 250) {
-        doc.addPage();
-        yPos = 20;
+    // Process all pages for this note
+    note.pages.forEach((page, pageIndex) => {
+      // Add page header for multi-page notes
+      if (pageIndex > 0) {
+        yPosition += 10;
       }
       
-      // Add note title
-      doc.setFontSize(14);
-      doc.text(note.title || 'Untitled Note', 20, yPos);
-      yPos += 7;
+      pdf.setFontSize(12);
+      pdf.text(`Page ${pageIndex + 1}`, 20, yPosition);
+      yPosition += 8;
       
-      // Add last modified date
-      doc.setFontSize(8);
-      doc.text(`Last modified: ${new Date(note.updatedAt).toLocaleString()}`, 20, yPos);
-      yPos += 5;
+      pdf.setFontSize(10);
       
-      // Add recordings info if any
-      if (note.recordings.length > 0) {
-        doc.text(`Voice notes: ${note.recordings.length}`, 20, yPos);
-        yPos += 5;
+      // Convert HTML content to plain text
+      const plainText = htmlToPlainText(page.content);
+      
+      // Split text into lines that fit on PDF page
+      const textLines = pdf.splitTextToSize(plainText, 170);
+      
+      // Check if we need a new page
+      if (yPosition + textLines.length * 7 > 280) {
+        pdf.addPage();
+        currentPage++;
+        yPosition = 20;
       }
       
-      // Add separator
-      doc.setLineWidth(0.1);
-      doc.line(20, yPos, 190, yPos);
-      yPos += 7;
+      // Add content lines
+      pdf.text(textLines, 20, yPosition);
+      yPosition += textLines.length * 7 + 10;
       
-      // Process all pages in this note
-      note.pages.forEach((page, pageIndex) => {
-        // Add page info
-        if (note.pages.length > 1) {
-          doc.setFontSize(11);
-          doc.setFont(undefined, 'bold');
-          doc.text(`Page ${pageIndex + 1} of ${note.pages.length}`, 20, yPos);
-          doc.setFont(undefined, 'normal');
-          yPos += 7;
-        }
-        
-        // Extract actual text content from HTML
-        const textContent = extractTextFromHTML(page.content);
-        
-        // Add note content with word wrapping and pagination
-        doc.setFontSize(10);
-        
-        // Split content into lines with word wrapping
-        const splitText = doc.splitTextToSize(textContent || '', 170);
-        
-        // Process content in chunks that fit on a page
-        for (let i = 0; i < splitText.length; i++) {
-          if (yPos > 280) {
-            doc.addPage();
-            yPos = 20;
-            // Add continuation header
-            doc.setFontSize(8);
-            if (note.pages.length > 1) {
-              doc.text(`${note.title || 'Untitled Note'} - Page ${pageIndex + 1} (continued)`, 20, yPos);
-            } else {
-              doc.text(`${note.title || 'Untitled Note'} (continued)`, 20, yPos);
-            }
-            doc.setFontSize(10);
-            yPos += 10;
-          }
-          
-          doc.text(splitText[i], 20, yPos);
-          yPos += 5;
-        }
-        
-        // Add extra space between pages
-        if (pageIndex < note.pages.length - 1) {
-          yPos += 10;
-          doc.setLineWidth(0.05);
-          doc.line(40, yPos - 5, 170, yPos - 5);
-          yPos += 10;
-        }
-      });
-      
-      // Add extra space between notes
-      yPos += 15;
-      
-      // Add separator between notes
-      if (noteIndex < notes.length - 1) {
-        if (yPos > 270) {
-          doc.addPage();
-          yPos = 20;
-        }
-        doc.setLineWidth(0.2);
-        doc.line(15, yPos - 5, 195, yPos - 5);
-        yPos += 15;
+      // Check if we need a page break for the next note page
+      if (pageIndex < note.pages.length - 1 && yPosition > 250) {
+        pdf.addPage();
+        currentPage++;
+        yPosition = 20;
       }
     });
-    
-    // Save the PDF
-    doc.save(`${title.replace(/\s+/g, '_')}_${formatDateForFilename(Date.now())}.pdf`);
-    toast.success('Notes exported as PDF');
-  } catch (error) {
-    console.error('Error exporting notes as PDF:', error);
-    toast.error('Failed to export notes as PDF');
-  }
-};
+  });
 
-// Export folder content as PDF
-export const exportFolderAsPDF = (folder: Folder, notes: Note[]): void => {
-  const folderNotes = notes.filter(note => note.folderId === folder.id);
-  if (folderNotes.length === 0) {
-    toast.error('No notes in this folder to export');
-    return;
-  }
-  
-  exportNotesAsPDF(folderNotes, `Folder: ${folder.name}`);
+  pdf.save(`${filename || "Notes"}.pdf`);
 };

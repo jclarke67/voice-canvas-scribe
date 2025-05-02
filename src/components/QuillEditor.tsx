@@ -12,6 +12,9 @@ import {
 import { Ellipsis, TextCursor } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
+// Import Quill as a type to access static properties
+const Quill = ReactQuill.Quill;
+
 interface QuillEditorProps {
   content: string;
   onChange: (content: string) => void;
@@ -72,24 +75,26 @@ const QuillEditor: React.FC<QuillEditorProps> = ({
         }
       });
       
-      // Register the custom size formats
-      const sizeStyle = quill.constructor.import('attributors/style/size');
-      sizeStyle.whitelist = [
-        '8pt', '9pt', '10pt', '12pt', '14pt', '16pt', 
-        '18pt', '24pt', '30pt', '36pt', '48pt', '60pt', '72pt'
-      ];
-      quill.constructor.register(sizeStyle, true);
-      
-      // Register line height formats
-      const Parchment = quill.constructor.import('parchment');
-      const lineHeightConfig = {
-        scope: Parchment.Scope.INLINE,
-        whitelist: ['1.0', '1.2', '1.5', '1.8', '2.0', '2.5', '3.0']
-      };
-      const LineHeightStyle = new Parchment.Attributor.Style('lineHeight', 'line-height', lineHeightConfig);
-      quill.constructor.register({
-        'formats/lineHeight': LineHeightStyle
-      });
+      if (Quill) {
+        // Register the custom size formats
+        const sizeStyle = Quill.import('attributors/style/size');
+        sizeStyle.whitelist = [
+          '8pt', '9pt', '10pt', '12pt', '14pt', '16pt', 
+          '18pt', '24pt', '30pt', '36pt', '48pt', '60pt', '72pt'
+        ];
+        Quill.register(sizeStyle, true);
+        
+        // Register line height formats
+        const Parchment = Quill.import('parchment');
+        const lineHeightConfig = {
+          scope: Parchment.Scope.INLINE,
+          whitelist: ['1.0', '1.2', '1.5', '1.8', '2.0', '2.5', '3.0']
+        };
+        const LineHeightStyle = new Parchment.Attributor.Style('lineHeight', 'line-height', lineHeightConfig);
+        Quill.register({
+          'formats/lineHeight': LineHeightStyle
+        });
+      }
     }
   }, [quillRef]);
   
