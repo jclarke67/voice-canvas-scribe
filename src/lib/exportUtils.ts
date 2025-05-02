@@ -1,6 +1,7 @@
 
 import { jsPDF } from "jspdf";
-import { Note } from "@/types";
+import { Note, Folder, Recording } from "@/types";
+import { getAudioFromStorage } from "./storage";
 
 // Helper function to convert HTML to plain text
 const htmlToPlainText = (html: string): string => {
@@ -95,4 +96,42 @@ export const exportNotesAsPDF = (notes: Note[], filename: string): void => {
   });
 
   pdf.save(`${filename || "Notes"}.pdf`);
+};
+
+// Add the missing exportFolderAsPDF function
+export const exportFolderAsPDF = (folder: Folder, allNotes: Note[]): void => {
+  // Filter notes that belong to this folder
+  const folderNotes = allNotes.filter(note => note.folderId === folder.id);
+  
+  if (folderNotes.length === 0) {
+    console.error("No notes found in this folder");
+    return;
+  }
+  
+  // Use the existing exportNotesAsPDF function
+  exportNotesAsPDF(folderNotes, folder.name);
+};
+
+// Add the missing exportRecording function
+export const exportRecording = (recording: Recording): void => {
+  if (!recording || !recording.audioUrl) {
+    console.error("Recording not found or has no audio URL");
+    return;
+  }
+  
+  // Get the audio data from storage
+  const audioData = getAudioFromStorage(`audio-${recording.audioUrl}`);
+  
+  if (!audioData) {
+    console.error("Audio data not found in storage");
+    return;
+  }
+  
+  // Create a download link for the audio
+  const link = document.createElement("a");
+  link.href = audioData;
+  link.download = `${recording.name || "Recording"}.webm`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 };
