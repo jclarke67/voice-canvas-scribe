@@ -3,12 +3,21 @@ import React, { useCallback, useEffect, useState, useRef } from 'react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import './QuillEditor.css'; // Custom styles for the editor
+import Quill from 'quill';
 
 interface QuillEditorProps {
   content: string;
   onChange: (content: string) => void;
   getCursorPosition?: () => number;
 }
+
+// Configure custom font sizes
+const Size = Quill.import('attributors/style/size');
+Size.whitelist = [
+  '8pt', '9pt', '10pt', '12pt', '14pt', '16pt', '18pt', 
+  '24pt', '30pt', '36pt', '48pt', '60pt', '72pt'
+];
+Quill.register(Size, true);
 
 const QuillEditor: React.FC<QuillEditorProps> = ({ 
   content, 
@@ -46,58 +55,34 @@ const QuillEditor: React.FC<QuillEditorProps> = ({
     if (quillRef.current) {
       const quill = quillRef.current.getEditor();
       
-      // Add image resize capability if it doesn't exist
-      if (!quill.getModule('imageResize')) {
-        // For non-Quill built-in modules, we would typically need to use additional libraries
-        // like quill-image-resize-module, but since we can't install new packages directly,
-        // we'll add basic resize functionality using CSS and the existing Quill API
-        
-        // Add click handler for images
-        quill.root.addEventListener('click', (event) => {
-          const target = event.target as HTMLElement;
-          if (target.tagName === 'IMG') {
-            // When an image is clicked, add a resize class
-            target.classList.add('quill-image-resizable');
-            
-            // Remove the class from all other images
-            quill.root.querySelectorAll('img.quill-image-resizable').forEach((img: Element) => {
-              if (img !== target) {
-                img.classList.remove('quill-image-resizable');
-              }
-            });
-          } else {
-            // When clicking elsewhere, remove all resize classes
-            quill.root.querySelectorAll('img.quill-image-resizable').forEach((img: Element) => {
+      // Setup image resize handlers
+      quill.root.addEventListener('click', (event) => {
+        const target = event.target as HTMLElement;
+        if (target.tagName === 'IMG') {
+          // When an image is clicked, add a resize class
+          target.classList.add('quill-image-resizable');
+          
+          // Remove the class from all other images
+          quill.root.querySelectorAll('img.quill-image-resizable').forEach((img: Element) => {
+            if (img !== target) {
               img.classList.remove('quill-image-resizable');
-            });
-          }
-        });
-      }
+            }
+          });
+        } else {
+          // When clicking elsewhere, remove all resize classes
+          quill.root.querySelectorAll('img.quill-image-resizable').forEach((img: Element) => {
+            img.classList.remove('quill-image-resizable');
+          });
+        }
+      });
     }
-  }, [quillRef]);
-  
-  // Define custom font sizes (in px)
-  const fontSizeAttributor = {
-    "8pt": "8pt",
-    "9pt": "9pt",
-    "10pt": "10pt",
-    "12pt": "12pt",
-    "14pt": "14pt",
-    "16pt": "16pt",
-    "18pt": "18pt",
-    "24pt": "24pt",
-    "30pt": "30pt",
-    "36pt": "36pt",
-    "48pt": "48pt",
-    "60pt": "60pt",
-    "72pt": "72pt"
-  };
+  }, []);
   
   const modules = {
     toolbar: [
       [{ 'header': [1, 2, 3, false] }],
       [{ 'font': [] }],
-      [{ 'size': Object.keys(fontSizeAttributor) }], // Font size options
+      [{ 'size': Size.whitelist }], // Use the registered size whitelist
       ['bold', 'italic', 'underline', 'strike', 'blockquote'],
       [{ 'color': [] }, { 'background': [] }], // Text color and highlighting
       [{'list': 'ordered'}, {'list': 'bullet'}, {'indent': '-1'}, {'indent': '+1'}],

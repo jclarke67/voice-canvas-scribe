@@ -5,6 +5,8 @@
 .ql-editor img {
   max-width: 100%;
   transition: box-shadow 0.2s ease;
+  display: block;
+  margin: 10px 0;
 }
 
 .ql-editor img.quill-image-resizable {
@@ -24,57 +26,57 @@
   content: attr(data-value) !important;
 }
 
-/* Font size class definitions */
+/* Font size class definitions - use !important to ensure they are applied */
 .ql-editor .ql-size-8pt {
-  font-size: 8pt;
+  font-size: 8pt !important;
 }
 
 .ql-editor .ql-size-9pt {
-  font-size: 9pt;
+  font-size: 9pt !important;
 }
 
 .ql-editor .ql-size-10pt {
-  font-size: 10pt;
+  font-size: 10pt !important;
 }
 
 .ql-editor .ql-size-12pt {
-  font-size: 12pt;
+  font-size: 12pt !important;
 }
 
 .ql-editor .ql-size-14pt {
-  font-size: 14pt;
+  font-size: 14pt !important;
 }
 
 .ql-editor .ql-size-16pt {
-  font-size: 16pt;
+  font-size: 16pt !important;
 }
 
 .ql-editor .ql-size-18pt {
-  font-size: 18pt;
+  font-size: 18pt !important;
 }
 
 .ql-editor .ql-size-24pt {
-  font-size: 24pt;
+  font-size: 24pt !important;
 }
 
 .ql-editor .ql-size-30pt {
-  font-size: 30pt;
+  font-size: 30pt !important;
 }
 
 .ql-editor .ql-size-36pt {
-  font-size: 36pt;
+  font-size: 36pt !important;
 }
 
 .ql-editor .ql-size-48pt {
-  font-size: 48pt;
+  font-size: 48pt !important;
 }
 
 .ql-editor .ql-size-60pt {
-  font-size: 60pt;
+  font-size: 60pt !important;
 }
 
 .ql-editor .ql-size-72pt {
-  font-size: 72pt;
+  font-size: 72pt !important;
 }
 
 /* Make sure editor takes full height */
@@ -87,6 +89,11 @@
 .ql-container {
   flex: 1;
   overflow: auto;
+}
+
+/* Improve spacing in editor */
+.ql-editor p {
+  margin-bottom: 1em;
 }
 
 /* Custom highlight colors */

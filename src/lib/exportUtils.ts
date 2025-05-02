@@ -1,3 +1,4 @@
+
 import { Note, Recording, Folder } from '@/types';
 import { getAudioFromStorage } from './storage';
 import { jsPDF } from 'jspdf';
@@ -9,10 +10,27 @@ const formatDateForFilename = (date: number): string => {
   return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}_${d.getHours().toString().padStart(2, '0')}-${d.getMinutes().toString().padStart(2, '0')}`;
 };
 
+// Get plain text content from HTML
+const htmlToPlainText = (html: string): string => {
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = html;
+  return tempDiv.textContent || tempDiv.innerText || '';
+};
+
 // Export a single note as text file
 export const exportNoteAsText = (note: Note): void => {
   try {
-    const blob = new Blob([`${note.title}\n\n${note.content}`], { type: 'text/plain' });
+    let plainText = `${note.title}\n\n`;
+    
+    // Add content from all pages
+    note.pages.forEach((page, index) => {
+      if (index > 0) {
+        plainText += `\n\n--- Page ${index + 1} ---\n\n`;
+      }
+      plainText += htmlToPlainText(page.content || '');
+    });
+    
+    const blob = new Blob([plainText], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     
     const a = document.createElement('a');
@@ -70,7 +88,7 @@ export const exportNotesAsPDF = (notes: Note[], title: string = 'Notes Export'):
     yPos += 15;
     
     // Process each note
-    notes.forEach((note, index) => {
+    notes.forEach((note, noteIndex) => {
       // Add page break if needed
       if (yPos > 250) {
         doc.addPage();
@@ -98,33 +116,50 @@ export const exportNotesAsPDF = (notes: Note[], title: string = 'Notes Export'):
       doc.line(20, yPos, 190, yPos);
       yPos += 7;
       
-      // Add note content with word wrapping and pagination
-      doc.setFontSize(10);
-      
-      // Split content into lines with word wrapping
-      const splitText = doc.splitTextToSize(note.content || '', 170);
-      
-      // Process content in chunks that fit on a page
-      for (let i = 0; i < splitText.length; i++) {
-        if (yPos > 280) {
-          doc.addPage();
-          yPos = 20;
-          // Add continuation header
-          doc.setFontSize(8);
-          doc.text(`${note.title || 'Untitled Note'} (continued)`, 20, yPos);
-          doc.setFontSize(10);
-          yPos += 10;
+      // Process all pages for this note
+      note.pages.forEach((page, pageIndex) => {
+        // Add page number if this is not the first page of the note
+        if (pageIndex > 0) {
+          yPos += 5;
+          doc.setFontSize(9);
+          doc.text(`Page ${pageIndex + 1}`, 20, yPos);
+          yPos += 7;
         }
         
-        doc.text(splitText[i], 20, yPos);
+        // Convert HTML content to plain text
+        const plainContent = htmlToPlainText(page.content || '');
+        
+        // Add note content with word wrapping and pagination
+        doc.setFontSize(10);
+        
+        // Split content into lines with word wrapping
+        const splitText = doc.splitTextToSize(plainContent, 170);
+        
+        // Process content in chunks that fit on a page
+        for (let i = 0; i < splitText.length; i++) {
+          if (yPos > 280) {
+            doc.addPage();
+            yPos = 20;
+            // Add continuation header
+            doc.setFontSize(8);
+            doc.text(`${note.title || 'Untitled Note'} (continued, page ${pageIndex + 1})`, 20, yPos);
+            doc.setFontSize(10);
+            yPos += 10;
+          }
+          
+          doc.text(splitText[i], 20, yPos);
+          yPos += 5;
+        }
+        
+        // Add a small gap between pages
         yPos += 5;
-      }
+      });
       
       // Add extra space between notes
       yPos += 10;
       
       // Add separator between notes
-      if (index < notes.length - 1) {
+      if (noteIndex < notes.length - 1) {
         if (yPos > 270) {
           doc.addPage();
           yPos = 20;
