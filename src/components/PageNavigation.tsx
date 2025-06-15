@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, Plus, Trash2, MoveVertical } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Trash2, Files } from 'lucide-react'; // Use Files icon for "pages"
 import { 
   Dialog, 
   DialogContent,
@@ -10,6 +10,10 @@ import {
   DialogFooter
 } from '@/components/ui/dialog';
 
+interface PagePreview {
+  id: string;
+  content: string;
+}
 interface PageNavigationProps {
   currentPage: number;
   totalPages: number;
@@ -17,6 +21,8 @@ interface PageNavigationProps {
   onAddPage: () => void;
   onDeletePage: () => void;
   onReorderPages?: (fromIndex: number, toIndex: number) => void;
+  // New optional prop: getPagePreviews
+  getPagePreviews?: () => PagePreview[];
 }
 
 const PageNavigation: React.FC<PageNavigationProps> = ({
@@ -25,35 +31,91 @@ const PageNavigation: React.FC<PageNavigationProps> = ({
   onPageChange,
   onAddPage,
   onDeletePage,
-  onReorderPages
+  onReorderPages,
+  getPagePreviews
 }) => {
   const [showReorderDialog, setShowReorderDialog] = useState(false);
-  const [selectedPageIndex, setSelectedPageIndex] = useState<number | null>(null);
-  
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [order, setOrder] = useState<number[]>(Array.from({ length: totalPages }, (_, i) => i));
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
+  // Refresh order state when totalPages changes (e.g., after adding/removing page)
+  React.useEffect(() => {
+    setOrder(Array.from({ length: totalPages }, (_, i) => i));
+  }, [totalPages, showReorderDialog]);
+
+  const previews: PagePreview[] =
+    typeof getPagePreviews === "function"
+      ? getPagePreviews()
+      : Array.from({ length: totalPages }, (_, i) => ({ id: String(i), content: `Page ${i + 1}` }));
+
   const handlePreviousPage = () => {
     if (currentPage > 0) {
       onPageChange(currentPage - 1);
     }
   };
-  
+
   const handleNextPage = () => {
     if (currentPage < totalPages - 1) {
       onPageChange(currentPage + 1);
     }
   };
-  
+
   const handleReorderClick = () => {
-    setSelectedPageIndex(currentPage);
+    setOrder(Array.from({ length: totalPages }, (_, i) => i));
     setShowReorderDialog(true);
   };
-  
-  const handleMovePageTo = (targetIndex: number) => {
-    if (onReorderPages && selectedPageIndex !== null && targetIndex !== selectedPageIndex) {
-      onReorderPages(selectedPageIndex, targetIndex);
+
+  // Drag and drop logic
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (index: number) => {
+    setDragOverIndex(index);
+  };
+
+  const handleDrop = () => {
+    if (draggedIndex === null || dragOverIndex === null || draggedIndex === dragOverIndex) {
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      return;
     }
+    const newOrder = [...order];
+    const [removed] = newOrder.splice(draggedIndex, 1);
+    newOrder.splice(dragOverIndex, 0, removed);
+    setOrder(newOrder);
+
+    // Actually reorder pages if the indexes have changed
+    if (onReorderPages) {
+      onReorderPages(draggedIndex, dragOverIndex);
+    }
+
+    setDraggedIndex(null);
+    setDragOverIndex(null);
     setShowReorderDialog(false);
   };
-  
+
+  // Handle manual cancel
+  const handleCancelDialog = () => {
+    setShowReorderDialog(false);
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  // Get a text summary for the thumbnail preview (first ~40 characters, no html)
+  const getThumbnailText = (content: string) => {
+    const text = content.replace(/<[^>]+>/g, '').slice(0, 40);
+    return text.length === 40 ? text + "..." : text;
+  };
+
+  // Get more for expanded thumbnail (first ~200 characters, no html)
+  const getExpandedPreviewText = (content: string) => {
+    const text = content.replace(/<[^>]+>/g, '').slice(0, 200);
+    return text.length === 200 ? text + "..." : text;
+  };
+
   return (
     <>
       <div className="flex items-center justify-between border-t py-2 px-4">
@@ -68,11 +130,11 @@ const PageNavigation: React.FC<PageNavigationProps> = ({
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          
+
           <span className="text-sm">
             Page {currentPage + 1} of {totalPages}
           </span>
-          
+
           <Button 
             variant="ghost" 
             size="sm" 
@@ -84,7 +146,6 @@ const PageNavigation: React.FC<PageNavigationProps> = ({
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
-        
         <div className="flex items-center space-x-1">
           {onReorderPages && totalPages > 1 && (
             <Button
@@ -95,10 +156,10 @@ const PageNavigation: React.FC<PageNavigationProps> = ({
               aria-label="Reorder pages"
               title="Reorder pages"
             >
-              <MoveVertical className="h-4 w-4" />
+              <Files className="h-4 w-4" /> {/* Changed from MoveVertical to Files icon */}
             </Button>
           )}
-          
+
           <Button
             variant="ghost"
             size="sm"
@@ -109,7 +170,7 @@ const PageNavigation: React.FC<PageNavigationProps> = ({
           >
             <Plus className="h-4 w-4" />
           </Button>
-          
+
           <Button
             variant="ghost"
             size="sm"
@@ -123,32 +184,67 @@ const PageNavigation: React.FC<PageNavigationProps> = ({
           </Button>
         </div>
       </div>
-      
+
       <Dialog open={showReorderDialog} onOpenChange={setShowReorderDialog}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[525px] relative">
           <DialogHeader>
             <DialogTitle>Reorder Pages</DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            <div className="text-sm mb-4">
-              Move page {selectedPageIndex !== null ? selectedPageIndex + 1 : ''} to position:
-            </div>
-            <div className="grid grid-cols-4 gap-2">
-              {Array.from({ length: totalPages }).map((_, index) => (
-                <Button
-                  key={index}
-                  variant={selectedPageIndex === index ? "secondary" : "outline"}
-                  onClick={() => handleMovePageTo(index)}
-                  disabled={selectedPageIndex === index}
-                  className="w-full"
+            <div className="text-sm mb-4">Drag and drop pages to reorder them:</div>
+            <div className="flex gap-3 flex-wrap min-h-[95px]">
+              {order.map((pageIdx, visualIdx) => (
+                <div
+                  key={pageIdx}
+                  draggable
+                  tabIndex={0}
+                  onDragStart={() => handleDragStart(visualIdx)}
+                  onDragOver={e => {
+                    e.preventDefault();
+                    handleDragOver(visualIdx);
+                  }}
+                  onDrop={() => handleDrop()}
+                  onMouseEnter={() => setHoveredIndex(visualIdx)}
+                  onMouseLeave={() => setHoveredIndex(null)}
+                  className={`transition-all relative border rounded shadow-sm bg-white dark:bg-muted/60 w-[70px] h-[90px] flex flex-col items-center justify-between px-1 py-1 cursor-move 
+                    ${visualIdx === draggedIndex ? 'opacity-40 border-primary' : ''}
+                    ${visualIdx === dragOverIndex && draggedIndex !== null && dragOverIndex !== draggedIndex
+                      ? 'ring-2 ring-primary'
+                      : ''}
+                  `}
+                  style={{
+                    zIndex: visualIdx === hoveredIndex ? 20 : 1,
+                  }}
                 >
-                  {index + 1}
-                </Button>
+                  <div className="w-full flex-1 flex items-center justify-center overflow-hidden text-xs text-center select-none">
+                    {/* Thumbnail preview of page content */}
+                    {previews[pageIdx]
+                      ? getThumbnailText(previews[pageIdx].content) || <span className="opacity-30">Empty</span>
+                      : <span className="opacity-30">No Data</span>
+                    }
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1 mb-0.5">
+                    #{pageIdx + 1}
+                  </div>
+                  {/* Expanded preview shown on hover */}
+                  {hoveredIndex === visualIdx && (
+                    <div className="absolute left-1/2 -translate-x-1/2 top-[100%] mt-2 min-w-[200px] max-w-xs bg-background border rounded shadow-2xl p-3 z-30 animate-fade-in pointer-events-none select-none opacity-95">
+                      <div className="text-xs font-semibold mb-1">
+                        Page {pageIdx + 1}
+                      </div>
+                      <div className="line-clamp-6 text-xs text-muted-foreground">
+                        {previews[pageIdx]
+                          ? getExpandedPreviewText(previews[pageIdx].content)
+                          : "No preview available"}
+                      </div>
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowReorderDialog(false)}>
+            <Button variant="outline" type="button" onClick={handleCancelDialog}>
               Cancel
             </Button>
           </DialogFooter>
