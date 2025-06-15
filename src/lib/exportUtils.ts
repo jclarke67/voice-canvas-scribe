@@ -76,17 +76,17 @@ export const exportNotesAsPDF = (notes: Note[], title: string = 'Notes Export'):
   try {
     const doc = new jsPDF();
     let yPos = 20;
-    
+
     // Add title
     doc.setFontSize(16);
     doc.text(title, 20, yPos);
     yPos += 10;
-    
+
     // Add date
     doc.setFontSize(10);
     doc.text(`Exported on ${new Date().toLocaleString()}`, 20, yPos);
     yPos += 15;
-    
+
     // Process each note
     notes.forEach((note, noteIndex) => {
       // Add page break if needed
@@ -94,70 +94,74 @@ export const exportNotesAsPDF = (notes: Note[], title: string = 'Notes Export'):
         doc.addPage();
         yPos = 20;
       }
-      
+
       // Add note title
       doc.setFontSize(14);
       doc.text(note.title || 'Untitled Note', 20, yPos);
       yPos += 7;
-      
+
       // Add last modified date
       doc.setFontSize(8);
       doc.text(`Last modified: ${new Date(note.updatedAt).toLocaleString()}`, 20, yPos);
       yPos += 5;
-      
+
       // Add recordings info if any
       if (note.recordings.length > 0) {
         doc.text(`Voice notes: ${note.recordings.length}`, 20, yPos);
         yPos += 5;
       }
-      
+
       // Add separator
       doc.setLineWidth(0.1);
       doc.line(20, yPos, 190, yPos);
       yPos += 7;
-      
-      // Process all pages for this note
+
+      // Process all pages for this note (preserving order and moving on only after all pages are printed)
       note.pages.forEach((page, pageIndex) => {
-        // Add page number if this is not the first page of the note
+        // Add page number if not first page of the note
         if (pageIndex > 0) {
           yPos += 5;
           doc.setFontSize(9);
           doc.text(`Page ${pageIndex + 1}`, 20, yPos);
           yPos += 7;
         }
-        
-        // Convert HTML content to plain text
+
+        // Convert HTML content to plain text and split by lines
         const plainContent = htmlToPlainText(page.content || '');
-        
-        // Add note content with word wrapping and pagination
+        const lineArr = plainContent.split('\n');
+
         doc.setFontSize(10);
-        
-        // Split content into lines with word wrapping
-        const splitText = doc.splitTextToSize(plainContent, 170);
-        
-        // Process content in chunks that fit on a page
-        for (let i = 0; i < splitText.length; i++) {
+
+        // Write each line, preserving empty lines as paragraph gaps
+        for (const line of lineArr) {
           if (yPos > 280) {
             doc.addPage();
             yPos = 20;
-            // Add continuation header
+            // Add a continuation header
             doc.setFontSize(8);
             doc.text(`${note.title || 'Untitled Note'} (continued, page ${pageIndex + 1})`, 20, yPos);
             doc.setFontSize(10);
             yPos += 10;
           }
-          
-          doc.text(splitText[i], 20, yPos);
-          yPos += 5;
+          // Word wrap each line to fit PDF width (170)
+          const wrappedLines = doc.splitTextToSize(line, 170);
+          for (const wrappedLine of wrappedLines) {
+            doc.text(wrappedLine, 20, yPos);
+            yPos += 5;
+          }
+          // If the line is empty (a paragraph break or extra newline), add vertical space
+          if (line.trim() === '') {
+            yPos += 3; // extra gap for empty lines
+          }
         }
-        
-        // Add a small gap between pages
+
+        // Gap between pages
         yPos += 5;
       });
-      
+
       // Add extra space between notes
       yPos += 10;
-      
+
       // Add separator between notes
       if (noteIndex < notes.length - 1) {
         if (yPos > 270) {
@@ -169,7 +173,7 @@ export const exportNotesAsPDF = (notes: Note[], title: string = 'Notes Export'):
         yPos += 15;
       }
     });
-    
+
     // Save the PDF
     doc.save(`${title.replace(/\s+/g, '_')}_${formatDateForFilename(Date.now())}.pdf`);
     toast.success('Notes exported as PDF');
