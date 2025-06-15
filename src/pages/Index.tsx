@@ -67,34 +67,42 @@ const NoteContainer = () => {
   
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
-      <ResizablePanelGroup direction="horizontal" onLayout={(sizes) => {
-        // Store the sizes in localStorage to persist user preferences
-        localStorage.setItem('sidebar-sizes', JSON.stringify(sizes));
-      }}>
+      <ResizablePanelGroup
+        direction="horizontal"
+        onLayout={(sizes) => {
+          // Store the sizes in localStorage to persist user preferences
+          localStorage.setItem('sidebar-sizes', JSON.stringify(sizes));
+        }}
+      >
         {sidebarOpen && (
           <>
-            <ResizablePanel 
-              defaultSize={isMobile ? 40 : 25} 
-              minSize={isMobile ? 25 : 15} 
+            <ResizablePanel
+              id="sidebar-panel"
+              order={1}
+              defaultSize={isMobile ? 40 : 25}
+              minSize={isMobile ? 25 : 15}
               maxSize={isMobile ? 75 : 40}
               className="h-screen"
               // This makes the panel resize correctly on mobile
               style={{ minWidth: isMobile ? '180px' : '200px' }}
             >
-              <Sidebar 
-                isOpen={sidebarOpen} 
-                toggleSidebar={toggleSidebar} 
+              <Sidebar
+                isOpen={sidebarOpen}
+                toggleSidebar={toggleSidebar}
                 onNoteCtrlClick={handleNoteCtrlClick}
               />
             </ResizablePanel>
             <ResizableHandle withHandle />
           </>
         )}
-        
-        <ResizablePanel defaultSize={75}>
+        <ResizablePanel
+          id="main-panel"
+          order={2}
+          defaultSize={75}
+        >
           <div className="flex-1 flex flex-col overflow-hidden relative h-[100vh]">
             {!sidebarOpen && (
-              <button 
+              <button
                 onClick={toggleSidebar}
                 className="absolute top-4 left-4 p-2 rounded-md bg-background border shadow-sm hover:bg-accent transition-colors z-10"
                 aria-label="Open sidebar"
@@ -102,9 +110,9 @@ const NoteContainer = () => {
                 <Menu size={20} />
               </button>
             )}
-            
+
             <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
-              <button 
+              <button
                 onClick={() => setShowKeyboardHelp(true)}
                 className="p-2 rounded-md bg-background border shadow-sm hover:bg-accent transition-colors"
                 aria-label="Keyboard shortcuts"
@@ -112,13 +120,13 @@ const NoteContainer = () => {
                 <HelpCircle size={18} />
               </button>
             </div>
-            
+
             {notes.length === 0 ? (
               <EmptyState />
             ) : (
               <NoteEditor />
             )}
-            
+
             {isMobile && (
               <button
                 onClick={handleCreateNote}
@@ -131,7 +139,7 @@ const NoteContainer = () => {
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>
-      
+
       <KeyboardShortcutsHelp isOpen={showKeyboardHelp} onClose={() => setShowKeyboardHelp(false)} />
     </div>
   );
